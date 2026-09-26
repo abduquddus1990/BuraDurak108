@@ -63,6 +63,7 @@ const RULES: Record<GameType, { name: string; sections: RuleSection[] }> = {
           "Himoyachi har bir kartani katta karta yoki kozir bilan uradi. Ura olmasa - stoldagi hamma kartani oladi.",
           "Faqat himoyachining ikki yonidagi o'yinchilar karta tashlaydi (stoldagi nominallar bilan).",
           "Hujum ikkala qo'shni ham \"Bita\" deganidan keyin tugaydi. Oxirida kartasi qolgan o'yinchi - durak.",
+          "Vdogonku: himoyachi \"Olish\" desa, qo'shnilar stoldagi nominallarga mos qo'shimcha karta tashlashi mumkin (himoyachi qo'lidagi kartalar sonigacha, stolda ko'pi bilan 6 ta). Ikkalasi \"Tamom\" desa - himoyachi hammasini oladi.",
         ],
       },
       {

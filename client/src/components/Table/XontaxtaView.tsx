@@ -577,6 +577,12 @@ export const XontaxtaView: React.FC<XontaxtaViewProps> = ({
                   {secondsLeft !== null && ` ${secondsLeft}s`}
                 </span>
               )}
+              {tableState.defenderTaking && (
+                <span className="block text-[11px] text-amber-300 font-bold mt-0.5">
+                  🧺 {tableState.players.find((p) => p.id === tableState.currentDefenderId)?.username} kartalarni oladi
+                  {isDefender ? " - qo'shnilar qo'shimcha tashlashini kuting" :" - qo'shimcha tashlash mumkin yoki \"Tamom\" deng"}
+                </span>
+              )}
               {targetableIds && targetableIds.size > 0 && (
                 <span className="block text-[10px] text-emerald-300 mt-0.5">Stoldagi yashil kartani bosib aynan uni uring</span>
               )}
@@ -626,6 +632,7 @@ export const XontaxtaView: React.FC<XontaxtaViewProps> = ({
               compact={true}
               playableHint={playableHint}
               onHint={onRequestHint}
+              defenderTaking={!!tableState.defenderTaking}
             />
           </div>
 
@@ -663,6 +670,7 @@ export const XontaxtaView: React.FC<XontaxtaViewProps> = ({
             compact={false}
             playableHint={playableHint}
             onHint={onRequestHint}
+            defenderTaking={!!tableState.defenderTaking}
           />
         </div>
       )}

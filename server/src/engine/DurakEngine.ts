@@ -14,6 +14,8 @@ export class DurakEngine extends BaseEngine {
   public attackerIndex: number = 0;
   public passedPlayers: Set<string> = new Set();
   public boutCount: number = 0;
+  // Vdogonku: himoyachi "olaman" dedi - qo'shnilar oxirgi marta qo'shimcha karta tashlashi mumkin
+  public defenderTaking: boolean = false;
 
   constructor(roomId: string, settings: RoomSettings) {
     super(roomId, settings);
@@ -40,6 +42,7 @@ export class DurakEngine extends BaseEngine {
     }
 
     this.boutCount = 0;
+    this.defenderTaking = false;
     this.attackerIndex = starterIndex;
     this.defenderIndex = (starterIndex + 1) % this.players.length;
     this.activePlayerIndex = this.attackerIndex;
@@ -75,6 +78,7 @@ export class DurakEngine extends BaseEngine {
     this.defenderIndex = this.nextInGame(this.attackerIndex);
     this.activePlayerIndex = this.attackerIndex;
     this.passedPlayers.clear();
+    this.defenderTaking = false;
     this.updatePlayerTurns();
   }
 
@@ -149,6 +153,15 @@ export class DurakEngine extends BaseEngine {
       card,
     });
 
+    if (this.defenderTaking) {
+      // Vdogonku: himoyachi urmaydi, tashlovchi yana tashlashi yoki "tamom" deyishi mumkin.
+      // Boshqa tashlay oladigan hech kim qolmasa - himoyachi darhol oladi.
+      if (!this.giveTurnToThrower(playerIndex)) {
+        return { success: true, message: `${player.username} qo'shimcha tashladi. ${this.players[this.defenderIndex].username} hammasini oldi!` };
+      }
+      return { success: true, message: `${player.username} qo'shimcha karta tashladi (vdogonku).` };
+    }
+
     this.activePlayerIndex = this.defenderIndex;
     this.passedPlayers.clear();
     this.updatePlayerTurns();
@@ -162,6 +175,7 @@ export class DurakEngine extends BaseEngine {
       return { success: false, message: "Siz himoyachi emassiz!" };
     }
 
+    if (this.defenderTaking) return { success: false, message: "Siz kartalarni olishga qaror qildingiz" };
     const defender = this.players[this.defenderIndex];
     if (!defender.hand.some(c => c.id === defenseCard.id)) {
       return { success: false, message: "Qo'lingizda bu karta yo'q!" };
@@ -204,6 +218,7 @@ export class DurakEngine extends BaseEngine {
     if (this.tableCards.length === 0) {
       return { success: false, message: "Stolda o'tkaziladigan karta yo'q!" };
     }
+    if (this.defenderTaking) return { success: false, message: "Siz kartalarni olishga qaror qildingiz" };
 
     const anyBeaten = this.tableCards.some(tc => !!tc.beatenBy);
     if (anyBeaten) {
@@ -239,23 +254,63 @@ export class DurakEngine extends BaseEngine {
     return { success: true, message: `${defender.username} hujumni ${this.players[this.defenderIndex].username} ga o'tkazdi!` };
   }
 
-  // Himoyachi kartalarni olishi (Vzyal / Karta olish)
+  // Himoyachi kartalarni olishi (Vzyal / Karta olish).
+  // Vdogonku: "olaman" deyilgach qo'shnilar stoldagi nominallarga mos qo'shimcha kartalar tashlashi mumkin
+  // (himoyachi qo'lidagi kartalar sonidan va stolda 6 tadan oshmasin). Ikkalasi "tamom" desa - hammasi olinadi.
   public takeCards(playerId: string): { success: boolean; message: string } {
     if (this.status !== 'PLAYING') return { success: false, message: "O'yin hozir faol emas" };
     if (this.players[this.defenderIndex].id !== playerId) {
       return { success: false, message: "Faqat himoyachi kartalarni olishi mumkin!" };
     }
-
     if (this.tableCards.length === 0) {
       return { success: false, message: "Stolda olinadigan karta yo'q!" };
     }
+    if (this.defenderTaking) {
+      return { success: false, message: "Qo'shnilar qo'shimcha karta tashlashini kuting" };
+    }
 
+    const defender = this.players[this.defenderIndex];
+    this.defenderTaking = true;
+    this.passedPlayers.clear();
+    if (!this.giveTurnToThrower(this.attackerIndex)) {
+      return { success: true, message: `${defender.username} stoldagi barcha kartalarni oldi!` };
+    }
+    return { success: true, message: `${defender.username} kartalarni oladi - qo'shnilar yana tashlashi mumkin (vdogonku).` };
+  }
+
+  // Vdogonku davomida qo'shimcha tashlay oladigan o'yinchilar (pas demagan, mos kartasi bor, cheklov to'lmagan)
+  private canStillThrow(index: number): boolean {
+    if (this.passedPlayers.has(this.players[index].id)) return false;
+    const unbeaten = this.tableCards.filter(tc => !tc.beatenBy).length;
+    if (this.tableCards.length >= MAX_ATTACK_CARDS || unbeaten + 1 > this.players[this.defenderIndex].hand.length) return false;
+    const ranks = new Set<string>();
+    for (const tc of this.tableCards) {
+      ranks.add(tc.card.rank);
+      if (tc.beatenBy) ranks.add(tc.beatenBy.rank);
+    }
+    return this.players[index].hand.some(c => ranks.has(c.rank));
+  }
+
+  // Navbatni tashlay oladigan qo'shniga beradi (avval preferred). Hech kim qolmasa - himoyachi oladi, false qaytadi.
+  private giveTurnToThrower(preferred: number): boolean {
+    const candidates = this.getDefenderNeighbors().filter(i => this.canStillThrow(i));
+    if (candidates.length === 0) {
+      this.finishTake();
+      return false;
+    }
+    this.activePlayerIndex = candidates.includes(preferred) ? preferred : candidates[0];
+    this.updatePlayerTurns();
+    return true;
+  }
+
+  private finishTake(): void {
     const defender = this.players[this.defenderIndex];
     for (const tc of this.tableCards) {
       defender.hand.push(tc.card);
       if (tc.beatenBy) defender.hand.push(tc.beatenBy);
     }
     this.tableCards = [];
+    this.defenderTaking = false;
 
     // Avval hujumchi, himoyachi esa oxirida to'ldiradi
     this.dealCardsRoundRobin(6, this.attackerIndex);
@@ -265,8 +320,6 @@ export class DurakEngine extends BaseEngine {
       // Olgan o'yinchi navbatini yo'qotadi: keyingi hujum undan keyingi o'yinchidan boshlanadi
       this.startNewBout(this.nextInGame(this.defenderIndex));
     }
-
-    return { success: true, message: `${defender.username} stoldagi barcha kartalarni oldi!` };
   }
 
   // Bita / Otboy / Pas
@@ -283,6 +336,14 @@ export class DurakEngine extends BaseEngine {
     }
     if (this.tableCards.length === 0) {
       return { success: false, message: "Stol bo'sh - avval hujum qiling!" };
+    }
+    if (this.defenderTaking) {
+      this.passedPlayers.add(playerId);
+      const defenderName = this.players[this.defenderIndex].username;
+      if (!this.giveTurnToThrower(playerIndex)) {
+        return { success: true, message: `${defenderName} stoldagi barcha kartalarni oldi!` };
+      }
+      return { success: true, message: `${this.players[playerIndex].username} qo'shimcha tashlamadi.` };
     }
     if (!this.tableCards.every(tc => !!tc.beatenBy)) {
       return { success: false, message: "Hali hamma karta urilmagan!" };
@@ -352,6 +413,7 @@ export class DurakEngine extends BaseEngine {
     return {
       ...base,
       currentDefenderId: this.players[this.defenderIndex]?.id,
+      defenderTaking: this.defenderTaking,
       currentAttackerId: this.players[this.attackerIndex]?.id,
     };
   }

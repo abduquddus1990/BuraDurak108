@@ -40,6 +40,7 @@ Loyiha qonuniy, pul tikilmaydigan sof musobaqa va do‘stona o‘yin (Competitiv
 * **Perekidli (Perevodnoy):** Himoyachi bir xil nominaldagi kartani qo‘yib hujumni keyingi o‘yinchiga o‘tkazadi.
 * **Perekidsiz (Podkidnoy):** Klassik oddiy tashlanadigan durak.
 * **Kim tashlaydi:** faqat himoyachining ikki yonidagi o‘yinchilar. Hujum ikkalasi ham **“Bita”** deganidan keyingina tugaydi.
+* **Vdogonku:** himoyachi “Olish” desa, qo‘shnilar mos nominaldagi qo‘shimcha kartalarni tashlashi mumkin (himoyachi qo‘lidagi kartalar sonigacha, stolda ko‘pi bilan 6 ta). Ikkalasi **“Tamom”** desa — himoyachi hammasini oladi.
 
 ---
 

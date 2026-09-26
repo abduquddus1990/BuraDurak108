@@ -24,6 +24,8 @@ interface CardHandProps {
   compact?: boolean;
   // Qaysi kartalar bilan yurish mumkinligi (xiralashtirish / yoritish)
   playableHint?: PlayableHint;
+  // Durak vdogonku: himoyachi olishga qaror qildi
+  defenderTaking?: boolean;
   // Botlar bilan o'yinda maslahat so'rash
   onHint?: () => void;
 }
@@ -46,6 +48,7 @@ export const CardHand: React.FC<CardHandProps> = ({
   cardBackId = 'paxtagul_gold',
   compact = false,
   playableHint = { mode: 'none' },
+  defenderTaking = false,
   onHint,
 }) => {
   const handleCardClick = (card: Card) => {
@@ -110,7 +113,7 @@ export const CardHand: React.FC<CardHandProps> = ({
         )}
 
         {/* DURAK: Himoyachi uchun "Kartalarni Olish" tugmasi */}
-        {gameType === 'DURAK' && isDefender && tableCardsCount > 0 && onTakeCards && (
+        {gameType === 'DURAK' && isDefender && tableCardsCount > 0 && !defenderTaking && onTakeCards && (
           <button
             onClick={onTakeCards}
             className={`${compact ? 'px-3 py-1 text-[11px]' : 'px-4 py-1.5 text-xs'} rounded-xl bg-gradient-to-r from-rose-700 to-red-800 text-white font-black shadow-lg hover:brightness-110 border border-rose-500/50 flex items-center gap-1`}
@@ -126,7 +129,7 @@ export const CardHand: React.FC<CardHandProps> = ({
             onClick={onPassOrFold}
             className={`${compact ? 'px-2.5 py-1 text-[11px]' : 'px-3.5 py-1.5 text-xs'} rounded-xl bg-stone-900/90 text-amber-200 border border-amber-700/60 font-bold shadow hover:bg-stone-800 flex items-center gap-1`}
           >
-            <span>{gameType === 'DURAK' ? '✋ Bita' : 'Pas'}</span>
+            <span>{gameType === 'DURAK' ? (defenderTaking ? '✋ Tamom' : '✋ Bita') : 'Pas'}</span>
           </button>
         )}
       </div>

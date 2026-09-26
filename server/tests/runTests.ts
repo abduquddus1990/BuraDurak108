@@ -166,6 +166,10 @@ console.log('--- 🧪 "CHOYXONA GAMES" YANGILANGAN TESTLARI (4-TALIK VA 6-TALIK 
 
   // Himoyachi oladi
   durak.takeCards('p2');
+  // Vdogonku: qo'shnilarda mos karta bo'lsa ular avval "tamom" deyishi kerak
+  for (let i = 0; i < 4 && durak.defenderTaking; i++) {
+    durak.passOrBita(durak.players[durak.activePlayerIndex].id);
+  }
   assert(durak.tableCards.length === 0, 'Himoyachi olgach stol tozalandi');
 }
 

@@ -127,4 +127,5 @@ export interface TableState {
   leadCardIds?: string[]; // Bura: javob berilishi kerak bo'lgan (oxirgi yurilgan/urilgan) kartalar
   lastTrick?: { winnerId: string; cards: PlayedTrickCard[] }; // Bura: oxirgi olingan vzyatka
   rematchVotes?: string[]; // O'yin tugagach "Yana bir partiya" deganlar
+  defenderTaking?: boolean; // Durak vdogonku: himoyachi oladi, qo'shnilar qo'shimcha tashlay oladi
 }
