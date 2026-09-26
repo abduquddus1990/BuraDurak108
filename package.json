@@ -1,0 +1,13 @@
+{
+  "name": "choyxona-bura-monorepo",
+  "version": "1.0.0",
+  "description": "Telegram Mini App: Bura, 108 va Durak karta o'yinlari platformasi",
+  "scripts": {
+    "server": "npm.cmd --prefix server start",
+    "client": "npm.cmd --prefix client run dev",
+    "test": "npm.cmd --prefix server test"
+  },
+  "keywords": ["telegram-mini-app", "bura", "108", "durak", "card-games", "uzbekistan"],
+  "author": "Choyxona Games Team",
+  "license": "MIT"
+}

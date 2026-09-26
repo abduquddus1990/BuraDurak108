@@ -1,0 +1,27 @@
+{
+  "name": "@choyxona/server",
+  "version": "1.0.0",
+  "main": "dist/server.js",
+  "scripts": {
+    "build": "tsc",
+    "start": "tsx src/server.ts",
+    "test": "tsx tests/runTests.ts && tsx tests/testBuraLastCardAndAlert.ts && tsx tests/testRegressions.ts && tsx tests/testAuthAndRating.ts",
+    "test:integration": "tsx tests/testJoinFlow.ts && tsx tests/testInviteFlow.ts && tsx tests/testServerFlows.ts",
+    "test:sim": "tsx tests/simulateBots.ts",
+    "tunnel": "tsx src/tunnel.ts"
+  },
+  "dependencies": {
+    "cors": "^2.8.5",
+    "express": "^4.19.2",
+    "ws": "^8.17.0"
+  },
+  "devDependencies": {
+    "@types/cors": "^2.8.17",
+    "@types/express": "^4.17.21",
+    "@types/node": "^20.12.7",
+    "@types/ws": "^8.5.10",
+    "localtunnel": "^2.0.2",
+    "tsx": "^4.7.2",
+    "typescript": "^5.4.0"
+  }
+}
