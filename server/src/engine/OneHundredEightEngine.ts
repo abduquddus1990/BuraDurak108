@@ -95,10 +95,16 @@ export class OneHundredEightEngine extends BaseEngine {
     return active[0].i;
   }
 
-  // Qo'lda qolgan karta jarimasi: Qarg'a (♠) damasi 40, boshqa damalar 20, qolganlari jadval bo'yicha
-  public static cardPenalty(card: Card): number {
-    if (card.rank === 'Q') return card.suit === 'SPADES' ? 40 : 20;
-    return ONE_HUNDRED_EIGHT_POINTS[card.rank] || 0;
+  // Dama yolg'iz o'zi qolgandagi (yoki oxirgi karta sifatida tashlangandagi) qiymati: Qarg'a (♠) 40, boshqalari 20
+  public static loneQueenValue(card: Card): number {
+    return card.suit === 'SPADES' ? 40 : 20;
+  }
+
+  // Qo'lda qolgan kartalar jarimasi. Dama faqat qo'lda yolg'iz o'zi qolsa 20/40 hisoblanadi;
+  // yonida boshqa kartalar ham bo'lsa - oddiy 3 ochko.
+  public static handPenalty(hand: Card[]): number {
+    if (hand.length === 1 && hand[0].rank === 'Q') return OneHundredEightEngine.loneQueenValue(hand[0]);
+    return hand.reduce((sum, c) => sum + (ONE_HUNDRED_EIGHT_POINTS[c.rank] || 0), 0);
   }
 
   // Karta tashlash mumkinligini tekshirish
@@ -366,11 +372,9 @@ export class OneHundredEightEngine extends BaseEngine {
     for (const player of this.players) {
       let roundPenalty = 0;
       if (player.id === roundWinnerId) {
-        if (lastCard?.rank === 'Q') roundPenalty = -OneHundredEightEngine.cardPenalty(lastCard);
+        if (lastCard?.rank === 'Q') roundPenalty = -OneHundredEightEngine.loneQueenValue(lastCard);
       } else if (!player.isEliminated) {
-        for (const card of player.hand) {
-          roundPenalty += OneHundredEightEngine.cardPenalty(card);
-        }
+        roundPenalty = OneHundredEightEngine.handPenalty(player.hand);
       }
 
       player.penaltyPoints += roundPenalty;

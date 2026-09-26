@@ -165,11 +165,10 @@ export class BotAI {
       return { action: 'PLAY', card: specialAttackCard };
     }
 
-    // Oddiy yurish: qo'lda qolsa eng ko'p jarima beradigan kartadan birinchi qutulamiz
-    // (dama ♠ = 40, dama = 20). Oxirgi karta dama bo'lsa bu qo'shimcha minus ochko beradi.
-    const byPenalty = [...playableCards].sort(
-      (a, b) => OneHundredEightEngine.cardPenalty(b) - OneHundredEightEngine.cardPenalty(a)
-    );
+    // Oddiy yurish: qo'lda qolsa eng ko'p jarima beradigan kartadan birinchi qutulamiz.
+    // Damani esa oxiriga asraymiz: yolg'iz qolsa ham, oxirgi karta sifatida tashlansa -20/-40 minus beradi.
+    const value = (c: Card) => (c.rank === 'Q' ? -1 : OneHundredEightEngine.handPenalty([c]));
+    const byPenalty = [...playableCards].sort((a, b) => value(b) - value(a));
     return {
       action: 'PLAY',
       card: byPenalty[0],

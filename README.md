@@ -28,7 +28,7 @@ Loyiha qonuniy, pul tikilmaydigan sof musobaqa va do‘stona o‘yin (Competitiv
   * Dama (Q) — **yangi mastni buyurtma qiladi**.
   * Qolgan qirollar va valetlar oddiy, hech qanday kuchsiz.
   * 6 va 7 liklar ishlaydi.
-* **Qo‘lda qolgan kartalar:** Tuz 11, 10 — 10, Qirol 4, 9/8/7/6 — o‘z qiymati, **Dama 20**, **Qarg‘a (♠) damasi 40** ochko.
+* **Qo‘lda qolgan kartalar:** Tuz 11, 10 — 10, Qirol 4, Dama 3, Valet 2, 9/8/7/6 — o‘z qiymati. Dama qo‘lda **yolg‘iz o‘zi** qolsa — **20**, **Qarg‘a (♠) damasi — 40** ochko.
 * **Dama bilan chiqish:** oxirgi kartasi dama bo‘lib chiqib ketgan o‘yinchining ochkosidan ♠ dama uchun **-40**, boshqa dama uchun **-20** ayriladi (ochko manfiy bo‘lishi mumkin: 0 bo‘lsa -40 dan davom etadi).
 * **Raund darhol tugaydi:** oxirgi karta 6, 7 yoki Qirol bo‘lsa ham jarimasi keyingi o‘yinchiga o‘tmaydi.
 * **Tarqatish:** eng ko‘p ochko to‘plagan (yutqazayotgan) o‘yinchi tarqatadi, undan keyingi o‘yinchi birinchi yuradi.

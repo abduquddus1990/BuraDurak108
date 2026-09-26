@@ -75,12 +75,16 @@ console.log('--- 🧪 CHOYXONA QOIDALARI TESTLARI ---\n');
   e.activeSuit = 'HEARTS';
   e.players[0].hand = [card('HEARTS', '10')];
   e.players[1].hand = [card('CLUBS', '6'), card('CLUBS', '7'), card('CLUBS', 'K')];
-  e.players[2].hand = [card('SPADES', 'Q'), card('HEARTS', 'Q')];
+  e.players[2].hand = [card('SPADES', 'Q'), card('HEARTS', '9')];
   e.playCard('p1', card('HEARTS', '10'));
   assert(e.players[1].penaltyPoints === 17, '6 + 7 + Qirol = 17 ochko');
-  assert(e.players[2].penaltyPoints === 60, "Qarg'a damasi 40 + boshqa dama 20 = 60 ochko");
+  assert(e.players[2].penaltyPoints === 12, "Dama boshqa karta bilan birga qolsa 3 ochko: 3 + 9 = 12");
   assert(
-    OneHundredEightEngine.cardPenalty(card('SPADES', 'J')) === 2 && OneHundredEightEngine.cardPenalty(card('HEARTS', 'J')) === 2,
+    OneHundredEightEngine.handPenalty([card('SPADES', 'Q')]) === 40 && OneHundredEightEngine.handPenalty([card('HEARTS', 'Q')]) === 20,
+    "Yolg'iz qolgan dama: qarg'a 40, boshqasi 20"
+  );
+  assert(
+    OneHundredEightEngine.handPenalty([card('SPADES', 'J')]) === 2 && OneHundredEightEngine.handPenalty([card('HEARTS', 'J')]) === 2,
     'Valet har qanday mastda 2 ochko'
   );
 }
