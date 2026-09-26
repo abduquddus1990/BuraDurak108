@@ -74,6 +74,7 @@ const toProfile = (u: StoredUser): UserProfile => ({
   telegramId: u.telegramId,
   username: u.username,
   displayName: u.displayName,
+  avatarUrl: u.avatarUrl,
   ratingElo: u.ratingElo,
   gamesPlayed: u.gamesPlayed,
   gamesWon: u.gamesWon,
@@ -182,6 +183,7 @@ wss.on('connection', (ws: WebSocket) => {
   const sender = (data: any) => sendTo(ws, data);
 
   const displayNameOf = (id: string) => userStore.get(id)?.displayName || "O'yinchi";
+  const avatarOf = (id: string) => userStore.get(id)?.avatarUrl;
 
   const requireSession = (): boolean => {
     if (currentPlayerId) return true;
@@ -220,6 +222,8 @@ wss.on('connection', (ws: WebSocket) => {
         telegramId: tgUser.id,
         username: tgUser.username || `user_${tgUser.id}`,
         displayName: sanitizeName(tgUser.first_name) || 'Choyxona Mehmoni',
+        // Faqat Telegram CDN dagi rasm (boshqa manzillar orqali kuzatuv/XSS ga yo'l qo'ymaslik uchun)
+        avatarUrl: typeof tgUser.photo_url === 'string' && /^https:\/\/t\.me\//.test(tgUser.photo_url) ? tgUser.photo_url : undefined,
       });
     } else {
       // Mehmon: avval berilgan imzoli ID bo'lsa - o'shani, aks holda yangisini beramiz
@@ -316,7 +320,8 @@ wss.on('connection', (ws: WebSocket) => {
           options.gameType,
           options.rules,
           options.totalPlayers,
-          sender
+          sender,
+          avatarOf(playerId)
         );
         currentRoomId = room.id;
         setUserStatus(playerId, room.id);
@@ -339,7 +344,7 @@ wss.on('connection', (ws: WebSocket) => {
         let room;
         if (existing && existing.engine.players.some(p => p.id === playerId)) {
           room = existing;
-          room.addPlayer(playerId, displayNameOf(playerId), false, sender);
+          room.addPlayer(playerId, displayNameOf(playerId), false, sender, avatarOf(playerId));
         } else {
           const safeRoomId = typeof clientRoomId === 'string' && /^[A-Za-z0-9_-]{4,40}$/.test(clientRoomId) && !existing
             ? clientRoomId
@@ -352,7 +357,8 @@ wss.on('connection', (ws: WebSocket) => {
             options.rules,
             options.totalPlayers,
             sender,
-            safeRoomId
+            safeRoomId,
+            avatarOf(playerId)
           );
         }
         currentRoomId = room.id;
@@ -383,7 +389,7 @@ wss.on('connection', (ws: WebSocket) => {
           return;
         }
         leaveCurrentRoom(roomId);
-        const joined = room.addPlayer(playerId, displayNameOf(playerId), false, sender);
+        const joined = room.addPlayer(playerId, displayNameOf(playerId), false, sender, avatarOf(playerId));
         if (joined) {
           currentRoomId = roomId;
           setUserStatus(playerId, roomId);
@@ -486,6 +492,16 @@ wss.on('connection', (ws: WebSocket) => {
           if (!result.success) {
             sender({ type: 'ACTION_ERROR', message: result.message });
           }
+        }
+        return;
+      }
+
+      // 3.1 Maslahat (faqat botlar bilan o'yinda)
+      if (type === 'GET_HINT') {
+        const room = currentRoomId ? roomManager.getRoom(currentRoomId) : undefined;
+        if (room) {
+          const hint = room.getHint(playerId);
+          sender(hint.success ? { type: 'HINT', message: hint.message, cardIds: hint.cardIds || [] } : { type: 'ACTION_ERROR', message: hint.message });
         }
         return;
       }

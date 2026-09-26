@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Card, Suit, SUIT_SYMBOLS, SUIT_NAMES_UZ } from '../../../../shared/src/types/card';
 import { PlayedTrickCard, GameType } from '../../../../shared/src/types/game';
 import { PlayingCard } from '../Cards/PlayingCard';
@@ -20,6 +20,8 @@ interface TableCenterProps {
   onSelectTrickCard?: (cardId: string) => void;
   eggMultiplier?: number;
   dealerName?: string;
+  // Durak: himoyachi karta tanlagach, urish mumkin bo'lgan stol kartalari (bosib nishon tanlanadi)
+  targetableIds?: Set<string>;
 }
 
 export const TableCenter: React.FC<TableCenterProps> = ({
@@ -37,11 +39,27 @@ export const TableCenter: React.FC<TableCenterProps> = ({
   onSelectTrickCard,
   eggMultiplier = 1,
   dealerName,
+  targetableIds,
 }) => {
   const theme: TableTheme = TABLE_THEMES[themeId] || TABLE_THEMES.classic_wood;
 
   // Foydalanuvchi talabiga ko'ra: stolda faqat so'nggi kartalar (maksimal 3 qator / 6 ta karta) ko'rinsin
   const visibleTableCards = tableCards.slice(-6);
+
+  // Stol tozalanganda (vzyatka / bita) oxirgi kartalar yig'ilish animatsiyasi bilan yo'qoladi
+  const previousCards = useRef(visibleTableCards);
+  const [collecting, setCollecting] = useState<typeof visibleTableCards>([]);
+  useEffect(() => {
+    if (visibleTableCards.length === 0 && previousCards.current.length > 0 && gameType !== 'ONE_HUNDRED_EIGHT') {
+      setCollecting(previousCards.current);
+      const timer = setTimeout(() => setCollecting([]), 450);
+      previousCards.current = visibleTableCards;
+      return () => clearTimeout(timer);
+    }
+    previousCards.current = visibleTableCards;
+  }, [tableCards]);
+  const cardsToRender = visibleTableCards.length > 0 ? visibleTableCards : collecting;
+  const isCollecting = visibleTableCards.length === 0 && collecting.length > 0;
 
   return (
     <div className="flex flex-col items-center gap-1 w-full max-w-sm">
@@ -138,7 +156,7 @@ export const TableCenter: React.FC<TableCenterProps> = ({
 
         {/* Stol markazidagi o'ynalgan kartalar (Faqat so'nggi 3 qator / 6 ta karta ko'rinadi) */}
         <div className="grid grid-cols-3 gap-2 sm:gap-2.5 items-center justify-center z-20 max-w-[180px] sm:max-w-[210px]">
-          {visibleTableCards.length === 0 ? (
+          {cardsToRender.length === 0 ? (
             <div
               className="col-span-3 text-xs sm:text-sm font-serif italic text-center opacity-40 select-none py-8"
               style={{ color: theme.textColor }}
@@ -146,10 +164,12 @@ export const TableCenter: React.FC<TableCenterProps> = ({
               Xontaxta bo'sh<br />Navbatdagi yurishni kuting
             </div>
           ) : (
-            visibleTableCards.map((trick, idx) => (
+            cardsToRender.map((trick, idx) => (
               <div
-                key={idx}
-                className="relative cursor-pointer transition-all duration-500 flex justify-center items-center"
+                key={`${trick.card.id}_${idx}`}
+                className={`relative cursor-pointer flex justify-center items-center rounded-md ${isCollecting ? 'anim-collect' : 'anim-fly-in'} ${
+                  targetableIds?.has(trick.card.id) ? 'ring-2 ring-emerald-400 ring-offset-1 ring-offset-transparent animate-pulse' : ''
+                }`}
                 onClick={() => onSelectTrickCard && onSelectTrickCard(trick.card.id)}
               >
                 {/* Asosiy yurilgan karta (yoki urolmay yopiq tashlangan karta) */}
@@ -163,7 +183,7 @@ export const TableCenter: React.FC<TableCenterProps> = ({
 
                 {/* Urilgan karta yurilgan kartaning ustiga bosiladi, pastdagi karta biroz ko'rinib turadi */}
                 {trick.beatenBy && (
-                  <div className="absolute top-1 left-1.5 rotate-3 z-30 shadow-2xl transition-all duration-500">
+                  <div className="absolute top-1 left-1.5 rotate-3 z-30 shadow-2xl anim-fly-in">
                     <PlayingCard card={trick.beatenBy} size="sm" />
                   </div>
                 )}

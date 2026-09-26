@@ -13,6 +13,7 @@ import { SettingsModal } from './components/Modals/SettingsModal';
 import { LeaderboardModal, LeaderboardEntry } from './components/Modals/LeaderboardModal';
 import { ThemeSelectorModal } from './components/Table/ThemeSelectorModal';
 import { AuthModal } from './components/Modals/AuthModal';
+import { RulesModal } from './components/Modals/RulesModal';
 import { InviteFriendsModal } from './components/Modals/InviteFriendsModal';
 import { InvitationToast } from './components/Modals/InvitationToast';
 import { gameClient } from './services/gameClient';
@@ -165,6 +166,9 @@ export function App() {
   // Ijobiy xabar (masalan, o'yin oxirida reyting o'zgarishi)
   const [infoNotice, setInfoNotice] = useState<string | null>(null);
   const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[] | null>(null);
+  const [connectionStatus, setConnectionStatus] = useState<'connected' | 'reconnecting'>('connected');
+  const [hint, setHint] = useState<{ cardIds: string[]; version: number }>({ cardIds: [], version: 0 });
+  const [isRulesOpen, setIsRulesOpen] = useState(false);
 
   const [localEngine, setLocalEngine] = useState<any>(null);
 
@@ -256,6 +260,10 @@ export function App() {
           setInfoNotice(`Reyting: ${sign}${data.ratingDelta} (ELO ${data.profile.ratingElo})`);
         }
       }
+      if (data.type === 'HINT') {
+        setInfoNotice(data.message);
+        setHint((prev) => ({ cardIds: data.cardIds || [], version: prev.version + 1 }));
+      }
       if (data.type === 'LEADERBOARD') {
         setLeaderboard(data.players || []);
       }
@@ -300,10 +308,12 @@ export function App() {
 
     // Aloqa uzilib qayta tiklansa: qayta ro'yxatdan o'tamiz, SESSION kelgach stolga qaytiladi
     const unsubscribeReconnect = gameClient.onReconnect(register);
+    const unsubscribeStatus = gameClient.onStatus(setConnectionStatus);
 
     return () => {
       unsubscribe();
       unsubscribeReconnect();
+      unsubscribeStatus();
     };
   }, []);
 
@@ -560,6 +570,34 @@ export function App() {
     }
   };
 
+  // Maslahat: onlayn - serverdan (faqat bot o'yinida), lokal rejimda - shu yerda bot AI orqali
+  const handleRequestHint = () => {
+    if (!localEngine) {
+      gameClient.requestHint();
+      return;
+    }
+    let cardIds: string[] = [];
+    let message = '💡 Maslahat';
+    if (localEngine instanceof BuraEngine) {
+      const move = BotAI.makeBuraMove(localEngine, currentUser.id);
+      const cards = move.action === 'FOLD' && (!move.cards || move.cards.length === 0)
+        ? localEngine.getCheapestCards(localEngine.getPlayerHand(currentUser.id), localEngine.lastLeadCards.length)
+        : move.cards || [];
+      cardIds = cards.map((c) => c.id);
+      message = move.action === 'DECLARE' ? `💡 Kombinatsiyani oching: ${move.type}!` : move.action === 'FOLD' ? "💡 Ura olmaysiz - eng arzon kartalarni tashlang" : '💡 Shu karta(lar) bilan yuring';
+    } else if (localEngine instanceof OneHundredEightEngine) {
+      const move = BotAI.make108Move(localEngine, currentUser.id);
+      if (move.card) cardIds = [move.card.id];
+      message = move.card ? '💡 Shu kartani tashlang' : "💡 Mos karta yo'q - bozordan oling";
+    } else if (localEngine instanceof DurakEngine) {
+      const move = BotAI.makeDurakMove(localEngine, currentUser.id);
+      if (move.card) cardIds = [move.card.id];
+      message = move.action === 'TAKE' ? '💡 Ura olmaysiz - kartalarni oling' : move.card ? '💡 Shu karta bilan yuring' : '💡 "Bita" deng';
+    }
+    setInfoNotice(message);
+    setHint((prev) => ({ cardIds, version: prev.version + 1 }));
+  };
+
   const handleOpenLeaderboard = () => {
     setIsLeaderboardOpen(true);
     if (gameClient.isConnected()) {
@@ -640,6 +678,12 @@ export function App() {
         </div>
       )}
 
+      {connectionStatus === 'reconnecting' && (
+        <div className="fixed top-0 inset-x-0 z-[120] bg-rose-900/95 text-rose-50 text-xs font-bold text-center py-1.5 shadow-lg animate-pulse">
+          📡 Aloqa uzildi, qayta ulanmoqda... O'yin saqlanib turibdi.
+        </div>
+      )}
+
       {infoNotice && (
         <div className="fixed top-16 left-1/2 -translate-x-1/2 z-[110] max-w-[90%] px-4 py-2 rounded-2xl bg-emerald-950/95 border border-emerald-500 text-emerald-100 text-xs font-bold shadow-2xl text-center">
           {infoNotice}
@@ -671,6 +715,7 @@ export function App() {
           onOpenClans={() => setIsClansOpen(true)}
           onOpenSettings={() => setIsSettingsOpen(true)}
           onOpenLeaderboard={handleOpenLeaderboard}
+          onOpenRules={() => setIsRulesOpen(true)}
           onOpenTheme={() => setIsThemeOpen(true)}
           onOpenAuth={() => {
             setAuthPromptMessage(undefined);
@@ -694,6 +739,9 @@ export function App() {
             onSelectBg={handleSelectBg}
             onSelectCardBack={handleSelectCardBack}
             onReadyNextRound={handleReadyNextRound}
+            hintCardIds={hint.cardIds}
+            hintVersion={hint.version}
+            onRequestHint={tableState.players.filter((p) => !p.isBot).length <= 1 ? handleRequestHint : undefined}
             onStartWithBots={() => {
               if (tableState.roomId && gameClient.isConnected()) {
                 gameClient.startRoomWithBots(tableState.roomId);
@@ -824,6 +872,7 @@ export function App() {
         onSelectBg={handleSelectBg}
         onSelectCardBack={handleSelectCardBack}
       />
+      <RulesModal isOpen={isRulesOpen} onClose={() => setIsRulesOpen(false)} />
       <AuthModal
         isOpen={isAuthOpen}
         onClose={() => {

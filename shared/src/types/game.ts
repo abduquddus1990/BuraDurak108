@@ -40,6 +40,7 @@ export interface PlayerPublic {
   isFolded: boolean;
   ready: boolean;
   isEliminated?: boolean; // 108 da 108 dan oshib chiqib ketgan o'yinchilar
+  isConnected?: boolean; // Odam stolga ulanganmi (uzilgan bo'lsa uning o'rniga server yuradi)
 }
 
 export interface PlayerPrivate extends PlayerPublic {
@@ -109,4 +110,7 @@ export interface TableState {
   turnRemainingMs?: number; // Navbat (yoki raund oxirida tayyorlik) uchun qolgan vaqt
   eggMultiplier?: number; // Bura: "tuxum"dan keyingi jarima ko'paytiruvchisi (1, 2, 4 ...)
   dealerId?: string; // 108: joriy qo'lni tarqatgan o'yinchi
+  pendingPenaltyRank?: '6' | '7' | null; // 108: qaysi karta zanjiri ketyapti
+  leadCardIds?: string[]; // Bura: javob berilishi kerak bo'lgan (oxirgi yurilgan/urilgan) kartalar
+  lastTrick?: { winnerId: string; cards: PlayedTrickCard[] }; // Bura: oxirgi olingan vzyatka
 }

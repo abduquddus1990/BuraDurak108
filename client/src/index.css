@@ -37,3 +37,51 @@
   -ms-overflow-style: none;
   scrollbar-width: none;
 }
+
+/* --- Animatsiyalar --- */
+
+/* Qo'lga karta kelishi (tarqatish / bozordan olish) */
+@keyframes card-deal {
+  from { opacity: 0; transform: translateY(-60px) scale(0.6) rotate(-12deg); }
+  to { opacity: 1; transform: none; }
+}
+.anim-deal {
+  animation: card-deal 0.38s cubic-bezier(0.2, 0.9, 0.3, 1.2) backwards;
+}
+
+/* Stolga karta tushishi */
+@keyframes card-fly-in {
+  from { opacity: 0; transform: translateY(70px) scale(0.7) rotate(8deg); }
+  to { opacity: 1; transform: none; }
+}
+.anim-fly-in {
+  animation: card-fly-in 0.32s cubic-bezier(0.2, 0.9, 0.3, 1.1) backwards;
+}
+
+/* Vzyatka yig'ib olinishi */
+@keyframes trick-collect {
+  from { opacity: 1; transform: none; }
+  to { opacity: 0; transform: translateY(-40px) scale(0.5); }
+}
+.anim-collect {
+  animation: trick-collect 0.45s ease-in both;
+}
+
+/* Maxsus kombinatsiya banneri */
+@keyframes pop-in {
+  0% { opacity: 0; transform: scale(0.6); }
+  70% { opacity: 1; transform: scale(1.06); }
+  100% { transform: scale(1); }
+}
+.anim-pop {
+  animation: pop-in 0.35s ease-out backwards;
+}
+
+/* Yurish mumkin bo'lgan karta yorug'i */
+.card-glow {
+  box-shadow: 0 0 0 2px rgba(52, 211, 153, 0.9), 0 0 14px rgba(52, 211, 153, 0.6);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .anim-deal, .anim-fly-in, .anim-collect, .anim-pop { animation: none; }
+}

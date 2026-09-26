@@ -3,6 +3,7 @@ import { Card } from '../../../../shared/src/types/card';
 import { CardBackId } from '../../types/theme';
 import { PlayingCard } from '../Cards/PlayingCard';
 import { triggerHaptic } from '../../services/telegramSdk';
+import { PlayableHint } from '../../../../shared/src/utils/playable';
 
 interface CardHandProps {
   hand: Card[];
@@ -21,6 +22,10 @@ interface CardHandProps {
   pendingPenaltyCount?: number;
   cardBackId?: CardBackId;
   compact?: boolean;
+  // Qaysi kartalar bilan yurish mumkinligi (xiralashtirish / yoritish)
+  playableHint?: PlayableHint;
+  // Botlar bilan o'yinda maslahat so'rash
+  onHint?: () => void;
 }
 
 export const CardHand: React.FC<CardHandProps> = ({
@@ -40,6 +45,8 @@ export const CardHand: React.FC<CardHandProps> = ({
   pendingPenaltyCount = 0,
   cardBackId = 'paxtagul_gold',
   compact = false,
+  playableHint = { mode: 'none' },
+  onHint,
 }) => {
   const handleCardClick = (card: Card) => {
     triggerHaptic('light');
@@ -58,6 +65,17 @@ export const CardHand: React.FC<CardHandProps> = ({
           >
             <span>👑</span>
             <span>Kombinatsiya!</span>
+          </button>
+        )}
+
+        {/* Maslahat (faqat botlar bilan o'yinda) */}
+        {onHint && isMyTurn && (
+          <button
+            onClick={onHint}
+            className={`${compact ? 'px-2.5 py-1 text-[11px]' : 'px-3 py-1.5 text-xs'} rounded-xl bg-sky-900/80 text-sky-100 border border-sky-500/60 font-bold shadow hover:bg-sky-800`}
+            title="Qanday yurish kerak?"
+          >
+            💡
           </button>
         )}
 
@@ -134,6 +152,10 @@ export const CardHand: React.FC<CardHandProps> = ({
                 cardBackId={cardBackId}
                 onClick={() => handleCardClick(card)}
                 size={compact && hand.length > 5 ? 'sm' : 'md'}
+                dimmed={playableHint.mode === 'dim' && !playableHint.ids.has(card.id)}
+                highlight={playableHint.mode === 'highlight' && playableHint.ids.has(card.id)}
+                animation="deal"
+                animationDelayMs={Math.min(index, 8) * 45}
               />
             </div>
           );

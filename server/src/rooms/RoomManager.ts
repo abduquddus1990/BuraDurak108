@@ -45,7 +45,8 @@ export class RoomManager {
     gameType: GameType,
     rules: GameRules,
     totalPlayers: number,
-    sender: SocketSender
+    sender: SocketSender,
+    avatarUrl?: string
   ): GameRoom {
     const roomId = `room_bot_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
     const settings: RoomSettings = {
@@ -60,7 +61,7 @@ export class RoomManager {
 
     const room = this.createRoom(settings);
     // 1-o'yinchi (haqiqiy odam)
-    room.addPlayer(playerId, playerName, false, sender);
+    room.addPlayer(playerId, playerName, false, sender, avatarUrl);
 
     // Qolgan o'rinlarga botlarni qo'shish
     const botNames = ['Bot Alisher', 'Bot Rustam', 'Bot Shavkat', 'Bot Sardor', 'Bot Bekzod'];
@@ -81,7 +82,8 @@ export class RoomManager {
     rules: GameRules,
     totalPlayers: number,
     sender: SocketSender,
-    customRoomId?: string
+    customRoomId?: string,
+    avatarUrl?: string
   ): GameRoom {
     const roomId = customRoomId || `room_fr_${Math.random().toString(36).substring(2, 8)}`;
     const settings: RoomSettings = {
@@ -96,7 +98,7 @@ export class RoomManager {
 
     const room = this.createRoom(settings);
     // Mezbonni 1-o'yinchiga qo'shish
-    room.addPlayer(hostId, hostName, false, sender);
+    room.addPlayer(hostId, hostName, false, sender, avatarUrl);
     return room;
   }
 

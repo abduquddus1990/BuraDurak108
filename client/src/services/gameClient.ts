@@ -11,6 +11,7 @@ export class GameClient {
   private reconnectDelayMs = 1000;
   private reconnectTimer?: ReturnType<typeof setTimeout>;
   private pendingConnect?: Promise<boolean>;
+  private statusHandlers: Set<(status: 'connected' | 'reconnecting') => void> = new Set();
 
   public connect(url: string = 'ws://localhost:3001'): Promise<boolean> {
     this.url = url;
@@ -27,6 +28,7 @@ export class GameClient {
           this.hasConnectedOnce = true;
           this.reconnectDelayMs = 1000;
           resolve(true);
+          for (const handler of this.statusHandlers) handler('connected');
           if (isReconnect) {
             for (const handler of this.reconnectHandlers) handler();
           }
@@ -52,7 +54,10 @@ export class GameClient {
           console.log('🔴 WebSocket uzildi');
           resolve(false);
           // Faqat avval muvaffaqiyatli ulangan bo'lsak qayta ulanamiz (server umuman yo'q bo'lsa - lokal rejim)
-          if (this.hasConnectedOnce) this.scheduleReconnect();
+          if (this.hasConnectedOnce) {
+            for (const handler of this.statusHandlers) handler('reconnecting');
+            this.scheduleReconnect();
+          }
         };
       } catch (e) {
         resolve(false);
@@ -134,6 +139,16 @@ export class GameClient {
     displayName?: string;
   }): void {
     this.send('REGISTER_USER', credentials);
+  }
+
+  // Aloqa holati (interfeysda "qayta ulanmoqda" banneri uchun)
+  public onStatus(handler: (status: 'connected' | 'reconnecting') => void): () => void {
+    this.statusHandlers.add(handler);
+    return () => this.statusHandlers.delete(handler);
+  }
+
+  public requestHint(): void {
+    this.send('GET_HINT', {});
   }
 
   public setDisplayName(displayName: string): void {

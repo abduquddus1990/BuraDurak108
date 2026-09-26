@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { GameType, BuraRules, DurakRules, OneHundredEightRules, GameRules } from '../../../../shared/src/types/game';
 import { UserProfile } from '../../../../shared/src/types/social';
-import { Bot, Users, Trophy, Shield, Settings, Palette, LogIn } from 'lucide-react';
+import { Bot, Users, Trophy, Shield, Settings, Palette, LogIn, BookOpen } from 'lucide-react';
 import { triggerHaptic } from '../../services/telegramSdk';
 
 interface LobbyViewProps {
@@ -16,6 +16,7 @@ interface LobbyViewProps {
   onOpenLeaderboard: () => void;
   onOpenTheme: () => void;
   onOpenAuth: () => void;
+  onOpenRules?: () => void;
 }
 
 export const LobbyView: React.FC<LobbyViewProps> = ({
@@ -30,6 +31,7 @@ export const LobbyView: React.FC<LobbyViewProps> = ({
   onOpenLeaderboard,
   onOpenTheme,
   onOpenAuth,
+  onOpenRules,
 }) => {
   const [selectedGame, setSelectedGame] = useState<GameType>('BURA');
   const [selectedBuraRule, setSelectedBuraRule] = useState<BuraRules>('ODDIY');
@@ -122,10 +124,19 @@ export const LobbyView: React.FC<LobbyViewProps> = ({
           >
             <Settings className="w-4 h-4" />
           </button>
+          {onOpenRules && (
+            <button
+              onClick={onOpenRules}
+              className="p-2 rounded-2xl bg-stone-800 text-stone-300 hover:text-amber-300 border border-stone-700/60 transition"
+              title="O'yin qoidalari"
+            >
+              <BookOpen className="w-4 h-4 text-sky-300" />
+            </button>
+          )}
           <button
             onClick={onOpenAuth}
             className="p-2 rounded-2xl bg-stone-800 text-stone-300 hover:text-amber-300 border border-stone-700/60 transition"
-            title="Kirish"
+            title="Ismni o'zgartirish"
           >
             <LogIn className="w-4 h-4 text-emerald-400" />
           </button>

@@ -2,6 +2,7 @@ import React from 'react';
 import { UserProfile } from '../../../../shared/src/types/social';
 import { Settings, User, CreditCard, Sparkles, MessageCircle, ExternalLink, Crown, X, Star } from 'lucide-react';
 import { triggerHaptic } from '../../services/telegramSdk';
+import { useUiPrefs } from '../../services/uiPrefs';
 
 interface SettingsModalProps {
   profile: UserProfile;
@@ -16,6 +17,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   onClose,
   onOpenAuth,
 }) => {
+  const { largeCards, sound, setPref } = useUiPrefs();
   if (!isOpen) return null;
 
   const handleOpenBot = (botUsername: string) => {
@@ -64,6 +66,24 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
               <span className="font-black text-emerald-300">ELO {profile.ratingElo} · {profile.gamesWon}/{profile.gamesPlayed}</span>
             </div>
           </div>
+        </div>
+
+        {/* Qulaylik sozlamalari */}
+        <div className="bg-stone-800/80 border border-stone-700 p-3.5 rounded-2xl flex flex-col gap-2.5">
+          <label className="flex items-center justify-between gap-3 cursor-pointer">
+            <span className="flex flex-col text-left">
+              <span className="text-xs font-bold text-stone-200">🔎 Katta kartalar</span>
+              <span className="text-[10px] text-stone-400">Kartalar va belgilar kattaroq ko'rinadi</span>
+            </span>
+            <input type="checkbox" className="w-5 h-5 accent-amber-500" checked={largeCards} onChange={(e) => setPref('largeCards', e.target.checked)} />
+          </label>
+          <label className="flex items-center justify-between gap-3 cursor-pointer">
+            <span className="flex flex-col text-left">
+              <span className="text-xs font-bold text-stone-200">🔊 Ovoz va e'lonlar</span>
+              <span className="text-[10px] text-stone-400">Karta ovozlari, "Moskva!", "Tuxum!" e'lonlari</span>
+            </span>
+            <input type="checkbox" className="w-5 h-5 accent-amber-500" checked={sound} onChange={(e) => setPref('sound', e.target.checked)} />
+          </label>
         </div>
 
         {/* 2. Pro Versiya, Donat va Maxsus Username Sotib Olish (10 000 so'm / 50 Stars) */}

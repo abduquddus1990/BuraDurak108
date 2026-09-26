@@ -1,6 +1,7 @@
 import { BaseEngine } from './BaseEngine';
 import { Card, Suit, ONE_HUNDRED_EIGHT_POINTS } from '../../../shared/src/types/card';
 import { RoomSettings, OneHundredEightRules, RoundSummary, RoundPlayerResult, TableState } from '../../../shared/src/types/game';
+import { can108Play } from '../../../shared/src/utils/playable';
 
 const SUITS: Suit[] = ['HEARTS', 'DIAMONDS', 'SPADES', 'CLUBS'];
 
@@ -109,27 +110,13 @@ export class OneHundredEightEngine extends BaseEngine {
 
   // Karta tashlash mumkinligini tekshirish
   public canPlayCard(card: Card): boolean {
-    if (this.pendingPenaltyCards > 0 && this.pendingPenaltyRank) {
-      return card.rank === this.pendingPenaltyRank;
-    }
-
-    if (!this.topDiscardCard) return true;
-
-    // Variant 1: Valet (J) istalgan karta ustiga tushadi
-    if (this.oneHundredEightRule === 'KOROL_QARGA' && card.rank === 'J') {
-      return true;
-    }
-
-    // Variant 2: Dama (Q) istalgan karta ustiga tushadi
-    if (this.oneHundredEightRule === 'KOROL_OLMA' && card.rank === 'Q') {
-      return true;
-    }
-
-    const requiredSuit = this.activeSuit || this.topDiscardCard.suit;
-    if (card.suit === requiredSuit) return true;
-    if (card.rank === this.topDiscardCard.rank) return true;
-
-    return false;
+    return can108Play(card, {
+      topCard: this.topDiscardCard,
+      activeSuit: this.activeSuit,
+      pendingPenaltyCount: this.pendingPenaltyCards,
+      pendingPenaltyRank: this.pendingPenaltyRank,
+      rule: this.oneHundredEightRule,
+    });
   }
 
   // Karta tashlash
@@ -428,6 +415,7 @@ export class OneHundredEightEngine extends BaseEngine {
       ...super.getTableState(),
       // Onlayn klient jarima zanjirini ko'rsatishi uchun (ilgari faqat lokal rejimda ko'rinardi)
       pendingPenaltyCount: this.pendingPenaltyCards,
+      pendingPenaltyRank: this.pendingPenaltyRank,
       dealerId: this.players[this.dealerIndex]?.id,
       roundSummary: this.roundSummary,
     };

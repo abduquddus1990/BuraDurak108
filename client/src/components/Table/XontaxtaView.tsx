@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { TableState, SpecialCombination } from '../../../../shared/src/types/game';
+import React, { useState, useEffect, useRef } from 'react';
+import { TableState, SpecialCombination, PlayerPublic } from '../../../../shared/src/types/game';
 import { Card, Suit } from '../../../../shared/src/types/card';
 import { ChatMessage } from '../../../../shared/src/types/chat';
 import { TableThemeId, AppBackgroundId, CardBackId, APP_BACKGROUNDS } from '../../types/theme';
@@ -14,7 +14,11 @@ import { RoundSummaryModal } from '../Modals/RoundSummaryModal';
 import { InGameChat } from '../Chat/InGameChat';
 import { requestFullscreenAndLandscape, exitLandscape, triggerHaptic } from '../../services/telegramSdk';
 import { canBeatCard } from '../../../../shared/src/utils/deck';
-import { ArrowLeft, MessageSquare, Palette, RotateCcw } from 'lucide-react';
+import { getPlayableHint } from '../../../../shared/src/utils/playable';
+import { playSound, announce } from '../../services/sound';
+import { useUiPrefs } from '../../services/uiPrefs';
+import { RulesModal } from '../Modals/RulesModal';
+import { ArrowLeft, MessageSquare, Palette, RotateCcw, BookOpen, Volume2, VolumeX, Eye } from 'lucide-react';
 
 interface XontaxtaViewProps {
   tableState: TableState;
@@ -36,6 +40,10 @@ interface XontaxtaViewProps {
   chatCooldown?: number;
   availableCombinations?: SpecialCombination[];
   pendingPenaltyCount?: number;
+  // Maslahat: tavsiya qilingan kartalar (hintVersion o'zgarganda tanlanadi)
+  hintCardIds?: string[];
+  hintVersion?: number;
+  onRequestHint?: () => void;
 }
 
 export const XontaxtaView: React.FC<XontaxtaViewProps> = ({
@@ -58,7 +66,13 @@ export const XontaxtaView: React.FC<XontaxtaViewProps> = ({
   chatCooldown = 0,
   availableCombinations = [],
   pendingPenaltyCount = 0,
+  hintCardIds,
+  hintVersion = 0,
+  onRequestHint,
 }) => {
+  const { sound, setPref } = useUiPrefs();
+  const [isRulesOpen, setIsRulesOpen] = useState(false);
+  const [showLastTrick, setShowLastTrick] = useState(false);
   const [selectedCardIds, setSelectedCardIds] = useState<string[]>([]);
   const [isChatOpen, setIsChatOpen] = useState(false);
   const [isThemeModalOpen, setIsThemeModalOpen] = useState(false);
@@ -144,6 +158,104 @@ export const XontaxtaView: React.FC<XontaxtaViewProps> = ({
     tableState.tableCards.length > 0 &&
     !!tableState.players.find((p) => p.id === currentUserId && p.cardsCount > 0);
   const canPlayNow = isMyTurn || canThrowIn;
+
+  // Yurish mumkin bo'lgan kartalar (ko'rsatkich - yakuniy tekshiruv serverda)
+  const playableHint = getPlayableHint(tableState, hand, currentUserId, canPlayNow);
+
+  // Maslahat kelganda tavsiya qilingan kartalarni avtomatik tanlab qo'yamiz
+  useEffect(() => {
+    if (hintCardIds && hintCardIds.length > 0) setSelectedCardIds(hintCardIds);
+  }, [hintVersion]);
+
+  // Navbat taymeri halqasi uchun (1 - to'liq vaqt)
+  const timerFraction =
+    secondsLeft !== null && tableState.status === 'PLAYING'
+      ? secondsLeft / Math.max(1, tableState.settings.turnTimeoutSeconds)
+      : null;
+
+  // --- Ovoz effektlari: holat o'zgarishiga qarab ---
+  const prevStateRef = useRef<TableState | null>(null);
+  useEffect(() => {
+    const prev = prevStateRef.current;
+    prevStateRef.current = tableState;
+    if (!prev || !sound) return;
+
+    const alert = tableState.specialCombinationAlert;
+    if (alert && alert.timestamp !== prev.specialCombinationAlert?.timestamp) {
+      playSound('alert');
+      const spoken: Record<string, string> = { MOSKVA: 'Moskva!', BURA: 'Bura!', MOLODKA: 'Molodka!', FORTY_ONE: 'Qirq bir!' };
+      announce(spoken[alert.type] || alert.title);
+      return;
+    }
+    if (tableState.roundSummary && !prev.roundSummary) {
+      if (tableState.roundSummary.reason?.includes('TUXUM')) {
+        announce('Tuxum!');
+        playSound('alert');
+      } else {
+        playSound(tableState.roundSummary.winnerId === currentUserId ? 'win' : 'lose');
+      }
+      return;
+    }
+    if (tableState.status === 'GAME_OVER' && prev.status !== 'GAME_OVER' && !tableState.roundSummary) {
+      playSound(tableState.winnerId === currentUserId ? 'win' : 'lose');
+      return;
+    }
+    if (tableState.status === 'PLAYING' && (prev.status !== 'PLAYING' || prev.roundNumber !== tableState.roundNumber)) {
+      playSound('deal');
+      return;
+    }
+    if (tableState.tableCards.length !== prev.tableCards.length || tableState.tableCards.some((tc, i) => !!tc.beatenBy !== !!prev.tableCards[i]?.beatenBy)) {
+      playSound('card');
+    }
+    const wasMyTurn = prev.players[prev.activePlayerIndex]?.id === currentUserId && prev.status === 'PLAYING';
+    if (isMyTurn && !wasMyTurn) {
+      playSound('turn');
+      triggerHaptic('light');
+    }
+  }, [tableState]);
+
+  // --- O'rindiqlar: raqiblar men o'tirgan joydan soat mili bo'yicha stol atrofiga joylashadi ---
+  const myIndex = tableState.players.findIndex((p) => p.id === currentUserId);
+  const opponentsInOrder: PlayerPublic[] = [];
+  for (let k = 1; k < tableState.players.length; k++) {
+    opponentsInOrder.push(tableState.players[(Math.max(0, myIndex) + k) % tableState.players.length]);
+  }
+  if (myIndex === -1 && tableState.players[0]) opponentsInOrder.unshift(tableState.players[0]);
+  let leftSeat: PlayerPublic | undefined;
+  let rightSeat: PlayerPublic | undefined;
+  let topSeats: PlayerPublic[] = opponentsInOrder;
+  if (opponentsInOrder.length >= 2) {
+    leftSeat = opponentsInOrder[0];
+    rightSeat = opponentsInOrder[opponentsInOrder.length - 1];
+    topSeats = opponentsInOrder.slice(1, -1);
+  }
+  const renderSeat = (player: PlayerPublic, position: 'top' | 'left' | 'right') => (
+    <PlayerSeat
+      key={player.id}
+      player={player}
+      position={position}
+      cardBackId={currentCardBackId}
+      gameType={tableState.settings.gameType}
+      compact={isLandscapeMode}
+      timerFraction={player.isTurn ? timerFraction : null}
+      isDealer={tableState.dealerId === player.id}
+    />
+  );
+
+  // Durak: qo'ldan karta tanlangach, stoldagi urilmagan kartaga bosib aynan uni urish
+  const selectedDefenseCard = isDefender && selectedCardIds.length === 1 ? hand.find((c) => c.id === selectedCardIds[0]) : undefined;
+  const targetableIds = selectedDefenseCard
+    ? new Set(
+        tableState.tableCards
+          .filter((tc) => !tc.beatenBy && canBeatCard(tc.card, selectedDefenseCard, tableState.trumpSuit))
+          .map((tc) => tc.card.id)
+      )
+    : undefined;
+  const handleSelectTrickCard = (cardId: string) => {
+    if (!selectedDefenseCard || !targetableIds?.has(cardId)) return;
+    onPlayAction('DEFEND', { card: selectedDefenseCard, targetCardId: cardId });
+    setSelectedCardIds([]);
+  };
 
   const otherPlayers = tableState.players.filter((p) => p.id !== currentUserId);
   const me = tableState.players.find((p) => p.id === currentUserId) || {
@@ -327,6 +439,32 @@ export const XontaxtaView: React.FC<XontaxtaViewProps> = ({
             </button>
           )}
 
+          {tableState.lastTrick && tableState.status === 'PLAYING' && (
+            <button
+              onClick={() => setShowLastTrick(true)}
+              className="p-1.5 rounded-xl bg-stone-900 text-stone-300 hover:text-amber-300 border border-stone-800"
+              title="Oxirgi vzyatka"
+            >
+              <Eye className="w-4 h-4" />
+            </button>
+          )}
+
+          <button
+            onClick={() => setPref('sound', !sound)}
+            className="p-1.5 rounded-xl bg-stone-900 text-stone-300 hover:text-amber-300 border border-stone-800"
+            title={sound ? "Ovozni o'chirish" : 'Ovozni yoqish'}
+          >
+            {sound ? <Volume2 className="w-4 h-4" /> : <VolumeX className="w-4 h-4" />}
+          </button>
+
+          <button
+            onClick={() => setIsRulesOpen(true)}
+            className="p-1.5 rounded-xl bg-stone-900 text-stone-300 hover:text-amber-300 border border-stone-800"
+            title="Qoidalar"
+          >
+            <BookOpen className="w-4 h-4" />
+          </button>
+
           <button
             onClick={() => setIsThemeModalOpen(true)}
             className="p-1.5 rounded-xl bg-stone-900 text-stone-300 hover:text-amber-300 border border-stone-800"
@@ -349,18 +487,15 @@ export const XontaxtaView: React.FC<XontaxtaViewProps> = ({
 
       {/* 2. Xontaxta Stol Maydoni */}
       <div className="flex-1 min-h-0 flex flex-col items-center justify-center p-1 sm:p-2 relative overflow-hidden">
-        <div className="w-full flex justify-around items-center mb-1 shrink-0">
-          {otherPlayers.map((player) => (
-            <PlayerSeat
-              key={player.id}
-              player={player}
-              position="top"
-              cardBackId={currentCardBackId}
-              gameType={tableState.settings.gameType}
-              compact={isLandscapeMode}
-            />
-          ))}
-        </div>
+        {topSeats.length > 0 && (
+          <div className="w-full flex justify-around items-start mb-1 shrink-0">
+            {topSeats.map((player) => renderSeat(player, 'top'))}
+          </div>
+        )}
+
+        <div className="flex-1 min-h-0 w-full flex items-center justify-between gap-1">
+          <div className="shrink-0 flex items-center">{leftSeat && renderSeat(leftSeat, 'left')}</div>
+          <div className="flex-1 min-w-0 h-full flex flex-col items-center justify-center">
 
         {/* Xontaxta Markazi */}
         {tableState.status === 'WAITING' ? (
@@ -409,6 +544,8 @@ export const XontaxtaView: React.FC<XontaxtaViewProps> = ({
               revealedTrumpCard={tableState.revealedTrumpCard}
               eggMultiplier={tableState.eggMultiplier}
               dealerName={tableState.players.find((p) => p.id === tableState.dealerId)?.username}
+              targetableIds={targetableIds}
+              onSelectTrickCard={handleSelectTrickCard}
             />
 
             {/* Navbat bildirishnomasi */}
@@ -423,9 +560,15 @@ export const XontaxtaView: React.FC<XontaxtaViewProps> = ({
                   {secondsLeft !== null && ` ${secondsLeft}s`}
                 </span>
               )}
+              {targetableIds && targetableIds.size > 0 && (
+                <span className="block text-[10px] text-emerald-300 mt-0.5">Stoldagi yashil kartani bosib aynan uni uring</span>
+              )}
             </div>
           </div>
         )}
+          </div>
+          <div className="shrink-0 flex items-center">{rightSeat && renderSeat(rightSeat, 'right')}</div>
+        </div>
       </div>
 
       {/* 3. O'yinchi O'rindig'i va Qo'lidagi Kartalar (Ekranning pastida 100% mustahkam ko'rinadi) */}
@@ -437,6 +580,8 @@ export const XontaxtaView: React.FC<XontaxtaViewProps> = ({
               player={me}
               position="bottom"
               isCurrentPlayer={true}
+              timerFraction={isMyTurn ? timerFraction : null}
+              isDealer={tableState.dealerId === currentUserId}
               cardBackId={currentCardBackId}
               gameType={tableState.settings.gameType}
               compact={true}
@@ -462,6 +607,8 @@ export const XontaxtaView: React.FC<XontaxtaViewProps> = ({
               pendingPenaltyCount={pendingPenaltyCount}
               cardBackId={currentCardBackId}
               compact={true}
+              playableHint={playableHint}
+              onHint={onRequestHint}
             />
           </div>
 
@@ -474,6 +621,8 @@ export const XontaxtaView: React.FC<XontaxtaViewProps> = ({
             player={me}
             position="bottom"
             isCurrentPlayer={true}
+            timerFraction={isMyTurn ? timerFraction : null}
+            isDealer={tableState.dealerId === currentUserId}
             cardBackId={currentCardBackId}
             gameType={tableState.settings.gameType}
             compact={false}
@@ -495,6 +644,8 @@ export const XontaxtaView: React.FC<XontaxtaViewProps> = ({
             pendingPenaltyCount={pendingPenaltyCount}
             cardBackId={currentCardBackId}
             compact={false}
+            playableHint={playableHint}
+            onHint={onRequestHint}
           />
         </div>
       )}
@@ -506,6 +657,32 @@ export const XontaxtaView: React.FC<XontaxtaViewProps> = ({
         onClose={() => setIsSpecialModalOpen(false)}
         onDeclare={handleDeclareCombination}
       />
+
+      <RulesModal isOpen={isRulesOpen} onClose={() => setIsRulesOpen(false)} initialGame={tableState.settings.gameType} />
+
+      {/* Oxirgi vzyatkani ko'rish */}
+      {showLastTrick && tableState.lastTrick && (
+        <div className="fixed inset-0 z-50 bg-black/70 flex items-center justify-center p-4" onClick={() => setShowLastTrick(false)}>
+          <div className="bg-stone-900/95 border-2 border-amber-500 rounded-3xl p-4 flex flex-col items-center gap-2 anim-pop">
+            <span className="text-xs font-black text-amber-200">
+              Oxirgi vzyatka: {tableState.players.find((p) => p.id === tableState.lastTrick!.winnerId)?.username}
+            </span>
+            <div className="flex flex-wrap justify-center gap-1.5 max-w-xs">
+              {tableState.lastTrick.cards.map((tc, i) => (
+                <div key={i} className="relative">
+                  <PlayingCard card={tc.card} isFaceDown={tc.isFaceDown} cardBackId={currentCardBackId} size="sm" />
+                  {tc.beatenBy && tc.beatenBy.id !== tc.card.id && (
+                    <div className="absolute top-1 left-1.5 rotate-3">
+                      <PlayingCard card={tc.beatenBy} size="sm" />
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+            <span className="text-[10px] text-stone-400">Yopish uchun bosing</span>
+          </div>
+        </div>
+      )}
 
       <SuitSelectorModal
         isOpen={isSuitModalOpen}

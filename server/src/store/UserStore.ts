@@ -8,6 +8,7 @@ export interface StoredUser {
   telegramId?: number;
   username: string;
   displayName: string;
+  avatarUrl?: string;
   ratingElo: number;
   gamesPlayed: number;
   gamesWon: number;
@@ -71,16 +72,17 @@ export class UserStore {
     return this.data.users[id];
   }
 
-  public upsert(id: string, fields: { telegramId?: number; username: string; displayName: string }): StoredUser {
+  public upsert(id: string, fields: { telegramId?: number; username: string; displayName: string; avatarUrl?: string }): StoredUser {
     const now = Date.now();
     const existing = this.data.users[id];
     const user: StoredUser = existing
-      ? { ...existing, telegramId: fields.telegramId ?? existing.telegramId, username: fields.username, lastSeenAt: now }
+      ? { ...existing, telegramId: fields.telegramId ?? existing.telegramId, username: fields.username, avatarUrl: fields.avatarUrl ?? existing.avatarUrl, lastSeenAt: now }
       : {
           id,
           telegramId: fields.telegramId,
           username: fields.username,
           displayName: fields.displayName,
+          avatarUrl: fields.avatarUrl,
           ratingElo: DEFAULT_ELO,
           gamesPlayed: 0,
           gamesWon: 0,

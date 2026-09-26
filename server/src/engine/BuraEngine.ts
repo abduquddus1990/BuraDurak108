@@ -1,6 +1,6 @@
 import { BaseEngine } from './BaseEngine';
 import { Card, Suit, BURA_CARD_POINTS, BURA_CARD_STRENGTH } from '../../../shared/src/types/card';
-import { RoomSettings, BuraRules, RoundSummary, RoundPlayerResult, TableState } from '../../../shared/src/types/game';
+import { RoomSettings, BuraRules, RoundSummary, RoundPlayerResult, TableState, PlayedTrickCard } from '../../../shared/src/types/game';
 import { detectSpecialCombinations, canBeatCard } from '../../../shared/src/utils/deck';
 
 export class BuraEngine extends BaseEngine {
@@ -17,6 +17,8 @@ export class BuraEngine extends BaseEngine {
   public moskvaWinnerId?: string;
   // "Tuxum" (яйцо): qo'l durang tugasa keyingi qo'l jarimalari 2 barobar (yana tuxum bo'lsa 4, 8 ...)
   public eggMultiplier: number = 1;
+  // Oxirgi olingan vzyatka (o'yinchilar "oxirgi vzyatkani ko'rish" uchun)
+  public lastTrick?: { winnerId: string; cards: PlayedTrickCard[] };
 
   constructor(roomId: string, settings: RoomSettings) {
     super(roomId, settings);
@@ -47,6 +49,7 @@ export class BuraEngine extends BaseEngine {
     this.isLastTrumpRevealed = false;
     this.revealedTrumpCard = undefined;
     this.specialCombinationAlert = null;
+    this.lastTrick = undefined;
 
     for (const player of this.players) {
       player.hand = [];
@@ -623,6 +626,7 @@ export class BuraEngine extends BaseEngine {
       winner.wonCards.push(card);
     }
     winner.score += trickScore;
+    this.lastTrick = { winnerId: winner.id, cards: this.tableCards.map(tc => ({ ...tc })) };
 
     this.tableCards = [];
     this.lastLeadCards = [];
@@ -801,16 +805,20 @@ export class BuraEngine extends BaseEngine {
     };
   }
 
+  // Yopiq tashlangan kartaning qiymati tarmoq orqali yuborilmaydi (devtools orqali ko'rib olmaslik uchun)
+  private maskFaceDown(cards: PlayedTrickCard[]): PlayedTrickCard[] {
+    return cards.map((tc, idx) =>
+      tc.isFaceDown ? { ...tc, card: { id: `hidden_${idx}`, suit: 'SPADES' as const, rank: '6' as const } } : tc
+    );
+  }
+
   public override getTableState(): TableState {
     const base = super.getTableState();
     return {
       ...base,
-      // Yopiq tashlangan kartaning qiymati tarmoq orqali yuborilmaydi (devtools orqali ko'rib olmaslik uchun)
-      tableCards: this.tableCards.map((tc, idx) =>
-        tc.isFaceDown
-          ? { ...tc, card: { id: `hidden_${idx}`, suit: 'SPADES' as const, rank: '6' as const } }
-          : tc
-      ),
+      tableCards: this.maskFaceDown(this.tableCards),
+      leadCardIds: this.lastLeadCards.map(c => c.id),
+      lastTrick: this.lastTrick ? { winnerId: this.lastTrick.winnerId, cards: this.maskFaceDown(this.lastTrick.cards) } : undefined,
       roundSummary: this.roundSummary,
       eggMultiplier: this.eggMultiplier,
     };

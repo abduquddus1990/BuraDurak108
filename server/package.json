@@ -5,7 +5,7 @@
   "scripts": {
     "build": "tsc",
     "start": "tsx src/server.ts",
-    "test": "tsx tests/runTests.ts && tsx tests/testBuraLastCardAndAlert.ts && tsx tests/testRegressions.ts && tsx tests/testAuthAndRating.ts && tsx tests/testRules.ts",
+    "test": "tsx tests/runTests.ts && tsx tests/testBuraLastCardAndAlert.ts && tsx tests/testRegressions.ts && tsx tests/testAuthAndRating.ts && tsx tests/testRules.ts && tsx tests/testTableFeatures.ts",
     "test:integration": "tsx tests/testJoinFlow.ts && tsx tests/testInviteFlow.ts && tsx tests/testServerFlows.ts",
     "test:sim": "tsx tests/simulateBots.ts",
     "tunnel": "tsx src/tunnel.ts"

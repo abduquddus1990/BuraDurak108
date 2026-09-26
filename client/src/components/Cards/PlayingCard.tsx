@@ -1,6 +1,7 @@
 import React from 'react';
 import { Card, SUIT_SYMBOLS } from '../../../../shared/src/types/card';
 import { CardBackId, CARD_BACK_THEMES } from '../../types/theme';
+import { useUiPrefs } from '../../services/uiPrefs';
 
 interface PlayingCardProps {
   card?: Card;
@@ -11,6 +12,13 @@ interface PlayingCardProps {
   onClick?: () => void;
   className?: string;
   size?: 'sm' | 'md' | 'lg';
+  // Hozir bu karta bilan yurib bo'lmaydi (xira ko'rinadi, lekin tanlash mumkin)
+  dimmed?: boolean;
+  // Foydali karta (yashil yorug')
+  highlight?: boolean;
+  // Paydo bo'lish animatsiyasi
+  animation?: 'deal' | 'fly-in';
+  animationDelayMs?: number;
 }
 
 export const PlayingCard: React.FC<PlayingCardProps> = ({
@@ -22,7 +30,16 @@ export const PlayingCard: React.FC<PlayingCardProps> = ({
   onClick,
   className = '',
   size = 'md',
+  dimmed = false,
+  highlight = false,
+  animation,
+  animationDelayMs = 0,
 }) => {
+  const { largeCards } = useUiPrefs();
+  // Katta kartalar rejimida har bir o'lcham bir pog'ona kattalashadi
+  if (largeCards) size = size === 'sm' ? 'md' : 'lg';
+  const animClass = animation === 'deal' ? 'anim-deal' : animation === 'fly-in' ? 'anim-fly-in' : '';
+  const animStyle = animation ? { animationDelay: `${animationDelayMs}ms` } : {};
   const sizeClasses = {
     sm: 'w-10 h-14 text-xs rounded-md overflow-hidden',
     md: 'w-14 h-20 text-xs sm:text-sm rounded-lg overflow-hidden',
@@ -34,8 +51,8 @@ export const PlayingCard: React.FC<PlayingCardProps> = ({
   if (isFaceDown || !card) {
     return (
       <div
-        className={`${sizeClasses[size]} ${cardBack.backgroundClass} shadow-md flex items-center justify-center p-1 relative border transition-all ${className}`}
-        style={{ borderColor: cardBack.borderColor }}
+        className={`${sizeClasses[size]} ${cardBack.backgroundClass} shadow-md flex items-center justify-center p-1 relative border transition-all ${animClass} ${className}`}
+        style={{ borderColor: cardBack.borderColor, ...animStyle }}
       >
         <div
           className="w-full h-full border border-dashed rounded flex flex-col items-center justify-center relative overflow-hidden"
@@ -58,10 +75,13 @@ export const PlayingCard: React.FC<PlayingCardProps> = ({
         bg-amber-50 text-slate-900 border-2 font-bold select-none cursor-pointer flex flex-col justify-between ${size === 'sm' ? 'p-1' : 'p-1.5'} relative
         ${isSelected ? 'border-amber-400 -translate-y-3 shadow-xl ring-2 ring-amber-400' : 'border-amber-200/80 shadow-md'}
         ${!isPlayable ? 'opacity-70 cursor-not-allowed filter grayscale-[30%]' : 'hover:-translate-y-2'}
+        ${dimmed && !isSelected ? 'opacity-45 brightness-75' : ''}
+        ${highlight && !isSelected ? 'card-glow' : ''}
         transition-all duration-500 ease-out
+        ${animClass}
         ${className}
       `}
-      style={{ color: isRed ? '#dc2626' : '#0f172a' }}
+      style={{ color: isRed ? '#dc2626' : '#0f172a', ...animStyle }}
     >
       {size === 'sm' ? (
         <div className="w-full h-full flex flex-col justify-between relative overflow-hidden">

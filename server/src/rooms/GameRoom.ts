@@ -51,7 +51,7 @@ export class GameRoom {
     }
   }
 
-  public addPlayer(id: string, username: string, isBot: boolean = false, sender?: SocketSender): boolean {
+  public addPlayer(id: string, username: string, isBot: boolean = false, sender?: SocketSender, avatarUrl?: string): boolean {
     const existingIndex = this.engine.players.findIndex(p => p.id === id);
     if (existingIndex !== -1) {
       // Qayta ulanish: o'yinchi o'z o'rniga qaytadi
@@ -68,6 +68,7 @@ export class GameRoom {
       id,
       username,
       isBot,
+      avatarUrl,
     });
     if (success && sender) {
       this.clients.set(id, sender);
@@ -144,8 +145,10 @@ export class GameRoom {
       }
     }
 
+    const baseState = this.engine.getTableState();
     const tableState = {
-      ...this.engine.getTableState(),
+      ...baseState,
+      players: baseState.players.map(p => ({ ...p, isConnected: p.isBot || this.clients.has(p.id) })),
       turnRemainingMs: this.turnDeadline !== null ? Math.max(0, this.turnDeadline - Date.now()) : undefined,
     };
     for (const [playerId, sender] of this.clients.entries()) {
@@ -214,6 +217,40 @@ export class GameRoom {
     }
 
     return result;
+  }
+
+  // Maslahat: bot qanday yurgan bo'lardi. Faqat bot bilan o'yinda (reytingli o'yinda adolatsiz bo'lardi)
+  public getHint(playerId: string): { success: boolean; message: string; cardIds?: string[] } {
+    const humans = this.engine.players.filter(p => !p.isBot).length;
+    if (humans > 1) return { success: false, message: "Maslahat faqat botlar bilan o'yinda ishlaydi" };
+    if (this.engine.status !== 'PLAYING') return { success: false, message: "O'yin hozir faol emas" };
+    const me = this.engine.players[this.engine.activePlayerIndex];
+    if (!me || me.id !== playerId) return { success: false, message: 'Navbatingizni kuting' };
+
+    if (this.engine instanceof BuraEngine) {
+      const move = BotAI.makeBuraMove(this.engine, playerId);
+      if (move.action === 'DECLARE') return { success: true, message: `💡 Kombinatsiyani oching: ${move.type}!` };
+      if (move.action === 'FOLD') {
+        const cards = move.cards && move.cards.length > 0 ? move.cards : this.engine.getCheapestCards(me.hand, this.engine.lastLeadCards.length);
+        return { success: true, message: "💡 Ura olmaysiz - eng arzon kartalarni tashlang", cardIds: cards.map(c => c.id) };
+      }
+      const cards = move.cards || [];
+      const text = this.engine.tableCards.length === 0 ? '💡 Shu karta(lar) bilan yuring' : '💡 Shu karta(lar) bilan uring';
+      return { success: true, message: text, cardIds: cards.map(c => c.id) };
+    }
+    if (this.engine instanceof OneHundredEightEngine) {
+      const move = BotAI.make108Move(this.engine, playerId);
+      if (move.action === 'PLAY' && move.card) return { success: true, message: '💡 Shu kartani tashlang', cardIds: [move.card.id] };
+      return { success: true, message: this.engine.pendingPenaltyCards > 0 ? '💡 Jarima kartalarini oling' : "💡 Mos karta yo'q - bozordan oling" };
+    }
+    if (this.engine instanceof DurakEngine) {
+      const move = BotAI.makeDurakMove(this.engine, playerId);
+      if ((move.action === 'ATTACK' || move.action === 'DEFEND') && move.card) {
+        return { success: true, message: move.action === 'ATTACK' ? '💡 Shu karta bilan yuring' : '💡 Shu karta bilan uring', cardIds: [move.card.id] };
+      }
+      return { success: true, message: move.action === 'TAKE' ? '💡 Ura olmaysiz - kartalarni oling' : '💡 "Bita" deng' };
+    }
+    return { success: false, message: "Maslahat yo'q" };
   }
 
   private markReady(playerId: string): { success: boolean; message: string } {
