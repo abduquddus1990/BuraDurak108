@@ -79,6 +79,10 @@ console.log('--- 🧪 CHOYXONA QOIDALARI TESTLARI ---\n');
   e.playCard('p1', card('HEARTS', '10'));
   assert(e.players[1].penaltyPoints === 17, '6 + 7 + Qirol = 17 ochko');
   assert(e.players[2].penaltyPoints === 60, "Qarg'a damasi 40 + boshqa dama 20 = 60 ochko");
+  assert(
+    OneHundredEightEngine.cardPenalty(card('SPADES', 'J')) === 2 && OneHundredEightEngine.cardPenalty(card('HEARTS', 'J')) === 2,
+    'Valet har qanday mastda 2 ochko'
+  );
 }
 
 // 3. 108: dama bilan chiqib ketsa minus ochko (75 -> 35, 0 -> -40, boshqa dama -20)

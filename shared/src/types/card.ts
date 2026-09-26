@@ -33,7 +33,7 @@ export const ONE_HUNDRED_EIGHT_POINTS: Record<Rank, number> = {
   '10': 10,
   'K': 4,
   'Q': 20,
-  'J': 2, // Variantga qarab qo'lda qolsa 2 yoki 20 bo'lishi mumkin
+  'J': 2, // Valet ikkala variantda ham 2 ochko (mast buyurtma qilsa ham qo'shimcha qiymati yo'q)
   '9': 9,
   '8': 8,
   '7': 7,
