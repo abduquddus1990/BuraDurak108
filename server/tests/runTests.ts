@@ -121,6 +121,9 @@ console.log('--- 🧪 "CHOYXONA GAMES" YANGILANGAN TESTLARI (4-TALIK VA 6-TALIK 
   engine108.players[1].hand.push(s2);
   engine108.activeSuit = 'HEARTS';
   engine108.topDiscardCard = { suit: 'HEARTS', rank: '10', id: 'HEARTS_10' };
+  // Tarqatuvchidan keyingi o'yinchi boshlaydi - test uchun navbatni Aliga beramiz
+  engine108.activePlayerIndex = 0;
+  engine108.updatePlayerTurns();
 
   engine108.playCard('p1', s1);
   assert(engine108.pendingPenaltyCards === 2, '7 tashlanganda jarima 2 ta');

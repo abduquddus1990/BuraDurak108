@@ -78,23 +78,23 @@ export class DurakEngine extends BaseEngine {
     this.updatePlayerTurns();
   }
 
-  public isDefenderNeighbor(playerIndex: number): boolean {
+  // Himoyachining chap va o'ng qo'shnilari (o'yindan chiqqanlar o'tkazib yuboriladi).
+  // Qoida: faqat shu ikki o'yinchi karta tashlay oladi. 2 kishida ikkalasi ham hujumchining o'zi.
+  public getDefenderNeighbors(): number[] {
     const n = this.players.length;
-    if (n < 4) return true;
-
-    // Chap qo'shni (counter-clockwise)
     let left = (this.defenderIndex - 1 + n) % n;
-    while (left !== this.defenderIndex && this.players[left].hand.length === 0 && this.deck.length === 0) {
+    while (left !== this.defenderIndex && this.isOut(left)) {
       left = (left - 1 + n) % n;
     }
-
-    // O'ng qo'shni (clockwise)
     let right = (this.defenderIndex + 1) % n;
-    while (right !== this.defenderIndex && this.players[right].hand.length === 0 && this.deck.length === 0) {
+    while (right !== this.defenderIndex && this.isOut(right)) {
       right = (right + 1) % n;
     }
+    return Array.from(new Set([left, right])).filter(i => i !== this.defenderIndex);
+  }
 
-    return playerIndex === left || playerIndex === right;
+  public isDefenderNeighbor(playerIndex: number): boolean {
+    return this.getDefenderNeighbors().includes(playerIndex);
   }
 
   // Hujum qilish (Karta tashlash)
@@ -112,11 +112,11 @@ export class DurakEngine extends BaseEngine {
       return { success: false, message: "Hujumni navbatdagi hujumchi boshlaydi!" };
     }
 
-    // 4 yoki 6 kishi o'ynaganda faqat himoyachining ikki yonidagi o'yinchilar hujum qila oladi!
-    if (this.players.length >= 4 && !this.isDefenderNeighbor(playerIndex)) {
+    // Faqat himoyachining ikki yonidagi o'yinchilar karta tashlay oladi
+    if (!this.isDefenderNeighbor(playerIndex)) {
       return {
         success: false,
-        message: "4 yoki 6 kishilik o'yinda faqat himoyachining yonidagi raqiblar (qo'shnilar) karta tashlay oladi!",
+        message: "Faqat himoyachining ikki yonidagi o'yinchilar karta tashlay oladi!",
       };
     }
 
@@ -182,7 +182,10 @@ export class DurakEngine extends BaseEngine {
 
     const allBeaten = this.tableCards.every(tc => !!tc.beatenBy);
     if (allBeaten) {
-      this.activePlayerIndex = this.attackerIndex;
+      // Navbat hali "bita" demagan, kartasi bor qo'shniga; bunday qo'shni qolmasa - bita avtomatik
+      if (this.giveTurnToWaitingNeighbor()) {
+        return { success: true, message: `${defender.username} hamma kartani urdi! Bita (Otboy).` };
+      }
     }
     this.updatePlayerTurns();
     return { success: true, message: `${defender.username} kartani urdi!` };
@@ -274,6 +277,10 @@ export class DurakEngine extends BaseEngine {
     if (playerIndex === this.defenderIndex) {
       return { success: false, message: "Himoyachi bita deya olmaydi - urish yoki olish kerak!" };
     }
+    // Faqat qo'shnilar (yoki navbat kelgan o'yinchi - masalan, oxirgi kartasini tashlab chiqib ketgan hujumchi) bita deydi
+    if (!this.isDefenderNeighbor(playerIndex) && playerIndex !== this.activePlayerIndex) {
+      return { success: false, message: "Bu hujumda faqat himoyachining ikki yonidagi o'yinchilar qatnashadi!" };
+    }
     if (this.tableCards.length === 0) {
       return { success: false, message: "Stol bo'sh - avval hujum qiling!" };
     }
@@ -282,17 +289,40 @@ export class DurakEngine extends BaseEngine {
     }
 
     this.passedPlayers.add(playerId);
+    if (this.giveTurnToWaitingNeighbor()) {
+      return { success: true, message: "Bita (Otboy)! Stol tozalandi, yangi hujum boshlanadi." };
+    }
+    const next = this.players[this.activePlayerIndex];
+    return { success: true, message: `${this.players[playerIndex].username} bita dedi. Navbat ${next.username} da.` };
+  }
+
+  // Hamma karta urilganda: hujum ikkala qo'shni ham "bita" deganidagina tugaydi. Hali pas demagan va kartasi bor
+  // qo'shniga navbat beriladi (u karta tashlashi yoki bita deyishi mumkin). Bunday qo'shni qolmasa - bita.
+  // Bita bo'lsa true qaytaradi.
+  private giveTurnToWaitingNeighbor(): boolean {
+    const waiting = this.getDefenderNeighbors().filter(
+      i => !this.passedPlayers.has(this.players[i].id) && this.players[i].hand.length > 0
+    );
+    if (waiting.length > 0) {
+      // Asosiy hujumchi hali kutayotgan bo'lsa - avval unga
+      this.activePlayerIndex = waiting.includes(this.attackerIndex) ? this.attackerIndex : waiting[0];
+      this.updatePlayerTurns();
+      return false;
+    }
+    this.finishBout();
+    return true;
+  }
+
+  // Bita: stol tozalanadi, kartalar to'ldiriladi, muvaffaqiyatli himoyalangan o'yinchi keyingi hujumni boshlaydi
+  private finishBout(): void {
     const previousDefender = this.defenderIndex;
     this.tableCards = [];
     this.dealCardsRoundRobin(6, this.attackerIndex);
 
     this.checkGameEnd();
     if (this.status === 'PLAYING') {
-      // Muvaffaqiyatli himoyalangan o'yinchi keyingi hujumni boshlaydi
       this.startNewBout(previousDefender);
     }
-
-    return { success: true, message: "Bita (Otboy)! Stol tozalandi, yangi hujum boshlanadi." };
   }
 
   private checkGameEnd(): void {

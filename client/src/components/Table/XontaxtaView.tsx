@@ -407,6 +407,8 @@ export const XontaxtaView: React.FC<XontaxtaViewProps> = ({
               pendingPenaltyCount={pendingPenaltyCount}
               isLastTrumpRevealed={tableState.isLastTrumpRevealed}
               revealedTrumpCard={tableState.revealedTrumpCard}
+              eggMultiplier={tableState.eggMultiplier}
+              dealerName={tableState.players.find((p) => p.id === tableState.dealerId)?.username}
             />
 
             {/* Navbat bildirishnomasi */}

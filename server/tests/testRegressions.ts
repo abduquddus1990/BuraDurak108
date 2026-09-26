@@ -255,7 +255,9 @@ console.log('--- 🧪 REGRESSIYA TESTLARI ---\n');
   d.attack('p1', card('CLUBS', '6'));
   d.defend('p2', 'CLUBS_6', card('CLUBS', '7'));
   const bita = d.passOrBita('p1');
-  assert(bita.success, 'Bita');
+  assert(bita.success && d.tableCards.length > 0, "Ali bita dedi, lekin hujum tugamadi (ikkinchi qo'shni kutilmoqda)");
+  assert(d.activePlayerIndex === 2, "Navbat himoyachining ikkinchi qo'shnisi Hasanga o'tdi");
+  assert(d.passOrBita('p3').success && d.tableCards.length === 0, "Ikkala qo'shni ham bita dedi - stol tozalandi");
   // Vali (p2) kartasiz qoldi -> keyingi hujumchi Hasan (p3), himoyachi Ali (p1)
   assert(d.attackerIndex === 2 && d.defenderIndex === 0, 'Kartasiz o\'yinchi o\'tkazib yuborildi');
 }

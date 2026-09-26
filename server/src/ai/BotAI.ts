@@ -165,10 +165,14 @@ export class BotAI {
       return { action: 'PLAY', card: specialAttackCard };
     }
 
-    // Oddiy eng mos kartani tashlaydi
+    // Oddiy yurish: qo'lda qolsa eng ko'p jarima beradigan kartadan birinchi qutulamiz
+    // (dama ♠ = 40, dama = 20). Oxirgi karta dama bo'lsa bu qo'shimcha minus ochko beradi.
+    const byPenalty = [...playableCards].sort(
+      (a, b) => OneHundredEightEngine.cardPenalty(b) - OneHundredEightEngine.cardPenalty(a)
+    );
     return {
       action: 'PLAY',
-      card: playableCards[0],
+      card: byPenalty[0],
       chosenSuit: bestSuit,
     };
   }

@@ -101,8 +101,9 @@ export const RoundSummaryModal: React.FC<RoundSummaryModalProps> = ({
                           </span>
                         ) : (
                           <>
-                            <span className="text-amber-300 font-bold text-[11px]">
-                              +{result.roundPenalty} ochko
+                            <span className={`font-bold text-[11px] ${result.roundPenalty < 0 ? 'text-emerald-300' : 'text-amber-300'}`}>
+                              {result.roundPenalty >= 0 ? `+${result.roundPenalty}` : result.roundPenalty} ochko
+                              {result.roundPenalty < 0 && ' (dama bilan chiqdi)'}
                             </span>
                             <span className="text-[10px] text-stone-400 font-semibold">
                               Jami: {result.totalPenalty} / 108

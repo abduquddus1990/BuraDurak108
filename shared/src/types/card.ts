@@ -27,11 +27,12 @@ export const BURA_CARD_POINTS: Record<Rank, number> = {
 };
 
 // 108 o'yinidagi qo'lda qolgan kartalar jarima ochkosi
+// Dama: 20 ochko, Qarg'a (♠) damasi esa 40 - bu OneHundredEightEngine.cardPenalty() da hisoblanadi
 export const ONE_HUNDRED_EIGHT_POINTS: Record<Rank, number> = {
   'A': 11,
   '10': 10,
   'K': 4,
-  'Q': 3,
+  'Q': 20,
   'J': 2, // Variantga qarab qo'lda qolsa 2 yoki 20 bo'lishi mumkin
   '9': 9,
   '8': 8,

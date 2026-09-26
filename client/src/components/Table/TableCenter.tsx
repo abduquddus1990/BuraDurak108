@@ -18,6 +18,8 @@ interface TableCenterProps {
   isLastTrumpRevealed?: boolean;
   revealedTrumpCard?: Card;
   onSelectTrickCard?: (cardId: string) => void;
+  eggMultiplier?: number;
+  dealerName?: string;
 }
 
 export const TableCenter: React.FC<TableCenterProps> = ({
@@ -33,6 +35,8 @@ export const TableCenter: React.FC<TableCenterProps> = ({
   isLastTrumpRevealed = false,
   revealedTrumpCard,
   onSelectTrickCard,
+  eggMultiplier = 1,
+  dealerName,
 }) => {
   const theme: TableTheme = TABLE_THEMES[themeId] || TABLE_THEMES.classic_wood;
 
@@ -48,6 +52,19 @@ export const TableCenter: React.FC<TableCenterProps> = ({
           <span className="text-sm font-black text-white">{SUIT_SYMBOLS[activeSuit]}</span>
           <span>{SUIT_NAMES_UZ[activeSuit]}</span>
         </div>
+      )}
+
+      {/* Bura: oldingi qo'l tuxum bo'lgan - bu qo'l jarimalari ko'paytiriladi */}
+      {gameType === 'BURA' && eggMultiplier > 1 && (
+        <div className="flex items-center gap-1.5 bg-amber-100/95 border-2 border-amber-500 px-2.5 py-0.5 rounded-full text-[11px] font-black text-stone-900 shadow-xl">
+          <span>🥚 Tuxum!</span>
+          <span>Bu qo'l jarimalari x{eggMultiplier}</span>
+        </div>
+      )}
+
+      {/* 108: qo'lni kim tarqatgani */}
+      {gameType === 'ONE_HUNDRED_EIGHT' && dealerName && (
+        <div className="text-[10px] font-semibold text-stone-300">🃏 Tarqatdi: <b className="text-amber-200">{dealerName}</b></div>
       )}
 
       {/* Bura da Kozir Ko'rsatkichi va So'nggi Krug Yangi Kozeri */}

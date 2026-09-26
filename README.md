@@ -15,6 +15,8 @@ Loyiha qonuniy, pul tikilmaydigan sof musobaqa va do‘stona o‘yin (Competitiv
 * **Molodka (5 ta bir xil nokozir mast):** Yurish navbati kelganda ochiladi va barcha 5 ta karta bilan birdaniga yuriladi.
 * **41+ lik Qoida:** Qo‘ldagi kartalar yig‘indisi $\ge 41$ ochko (masalan, 3 ta 10 + 1 ta Tuz = 41) bo‘lsa, stolga ochiladi va raqiblar uni urishga urinadi. Ura olishmasa, ochgan o‘yinchi 41+ ochkoni o‘z hisobiga oladi.
 * **Molotkali & Oddiy variantlar:** Klassik 3 kartalik 31 ochko qoidalari.
+* **Jarimalar (-12 gacha):** qo‘l yutqazilganda 0 ochko — 6, 31 dan kam — 4, 31 va undan ko‘p — 2 jarima. 12 jarimaga yetgan partiyani yutqazadi.
+* **Tuxum (Яйцо):** qo‘l oxirida eng ko‘p ochko teng bo‘lsa, jarima yozilmaydi va qo‘l qayta tarqatiladi. Keyingi qo‘l jarimalari **x2** (31 gacha — 8, 31+ — 4). Yana tuxum bo‘lsa **x4** va hokazo.
 
 ### 2. 108 O‘yini (4 tadan karta tarqatiladi)
 * **1-variant (Korol Qarg‘a ♠):**
@@ -26,6 +28,10 @@ Loyiha qonuniy, pul tikilmaydigan sof musobaqa va do‘stona o‘yin (Competitiv
   * Dama (Q) — **yangi mastni buyurtma qiladi**.
   * Qolgan qirollar va valetlar oddiy, hech qanday kuchsiz.
   * 6 va 7 liklar ishlaydi.
+* **Qo‘lda qolgan kartalar:** Tuz 11, 10 — 10, Qirol 4, 9/8/7/6 — o‘z qiymati, **Dama 20**, **Qarg‘a (♠) damasi 40** ochko.
+* **Dama bilan chiqish:** oxirgi kartasi dama bo‘lib chiqib ketgan o‘yinchining ochkosidan ♠ dama uchun **-40**, boshqa dama uchun **-20** ayriladi (ochko manfiy bo‘lishi mumkin: 0 bo‘lsa -40 dan davom etadi).
+* **Raund darhol tugaydi:** oxirgi karta 6, 7 yoki Qirol bo‘lsa ham jarimasi keyingi o‘yinchiga o‘tmaydi.
+* **Tarqatish:** eng ko‘p ochko to‘plagan (yutqazayotgan) o‘yinchi tarqatadi, undan keyingi o‘yinchi birinchi yuradi.
 * **108 ning eng oliy qoidasi (Qutqaruv / Kamikadze):**
   * Jarima ochkolari 108 dan oshsa o‘yindan chiqadi.
   * Agar raundda o‘yinchining jarimasi **aynan 108 ochko** bo‘lsa — uning ochkolari yonadi va **0 ga tushadi**!
@@ -33,6 +39,7 @@ Loyiha qonuniy, pul tikilmaydigan sof musobaqa va do‘stona o‘yin (Competitiv
 ### 3. Durak
 * **Perekidli (Perevodnoy):** Himoyachi bir xil nominaldagi kartani qo‘yib hujumni keyingi o‘yinchiga o‘tkazadi.
 * **Perekidsiz (Podkidnoy):** Klassik oddiy tashlanadigan durak.
+* **Kim tashlaydi:** faqat himoyachining ikki yonidagi o‘yinchilar. Hujum ikkalasi ham **“Bita”** deganidan keyingina tugaydi.
 
 ---
 

@@ -15,6 +15,8 @@ export class BuraEngine extends BaseEngine {
   public isResolvingTrick: boolean = false;
   // Partiya Moskva bilan tugagan bo'lsa - uning egasi
   public moskvaWinnerId?: string;
+  // "Tuxum" (яйцо): qo'l durang tugasa keyingi qo'l jarimalari 2 barobar (yana tuxum bo'lsa 4, 8 ...)
+  public eggMultiplier: number = 1;
 
   constructor(roomId: string, settings: RoomSettings) {
     super(roomId, settings);
@@ -29,6 +31,7 @@ export class BuraEngine extends BaseEngine {
     this.roundSummary = undefined;
     this.isResolvingTrick = false;
     this.moskvaWinnerId = undefined;
+    this.eggMultiplier = 1;
 
     for (const player of this.players) {
       player.penaltyPoints = 0; // O'yin boshida jarima 0
@@ -670,16 +673,39 @@ export class BuraEngine extends BaseEngine {
   }
 
   private finishRoundByCardsEnd(): void {
-    let maxScore = -1;
-    let winner = this.players[0];
-    for (const p of this.players) {
-      if (p.score > maxScore) {
-        maxScore = p.score;
-        winner = p;
-      }
+    const maxScore = Math.max(...this.players.map(p => p.score));
+    const leaders = this.players.filter(p => p.score === maxScore);
+
+    if (leaders.length >= 2) {
+      this.declareEgg(leaders.map(p => p.username));
+      return;
     }
+
+    const winner = leaders[0];
     this.winnerId = winner.id;
     this.calculateRoundPenalties(winner, "Barcha kartalar o'ynaldi!");
+  }
+
+  // Tuxum: eng ko'p ochko teng - hech kimga jarima yozilmaydi, qo'l qayta tarqatiladi,
+  // keyingi qo'l jarimalari 2 barobar oshadi. Keyingi qo'lni oldingi qo'l boshlovchisi boshlaydi.
+  private declareEgg(tiedNames: string[]): void {
+    this.eggMultiplier *= 2;
+    this.status = 'ROUND_OVER';
+    this.roundSummary = {
+      roundNumber: this.roundNumber,
+      results: this.players.map(p => ({
+        playerId: p.id,
+        username: p.username,
+        wonCards: p.wonCards || [],
+        roundScore: p.score,
+        roundPenalty: 0,
+        totalPenalty: p.penaltyPoints,
+        readyForNext: p.isBot,
+      })),
+      isGameOver: false,
+      reason: `🥚 TUXUM! ${tiedNames.join(' va ')} teng ochko to'pladi. Keyingi qo'l jarimalari x${this.eggMultiplier}!`,
+      winnerId: undefined,
+    };
   }
 
   private calculateRoundPenalties(winner: any, reason: string, endsWholeGame: boolean = false): void {
@@ -703,6 +729,7 @@ export class BuraEngine extends BaseEngine {
         }
       }
 
+      roundPenalty *= this.eggMultiplier;
       p.penaltyPoints += roundPenalty;
 
       results.push({
@@ -715,6 +742,8 @@ export class BuraEngine extends BaseEngine {
         readyForNext: p.isBot,
       });
     }
+
+    this.eggMultiplier = 1;
 
     // O'yin -12 gacha (12 jarimagacha) davom etadi
     const hasMatchLoser = this.players.some(p => p.penaltyPoints >= 12);
@@ -783,6 +812,7 @@ export class BuraEngine extends BaseEngine {
           : tc
       ),
       roundSummary: this.roundSummary,
+      eggMultiplier: this.eggMultiplier,
     };
   }
 }

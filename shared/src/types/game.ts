@@ -107,4 +107,6 @@ export interface TableState {
   specialCombinationAlert?: SpecialCombinationAlert | null;
   pendingPenaltyCount?: number; // 108 da to'plangan 6/7 jarima kartalari
   turnRemainingMs?: number; // Navbat (yoki raund oxirida tayyorlik) uchun qolgan vaqt
+  eggMultiplier?: number; // Bura: "tuxum"dan keyingi jarima ko'paytiruvchisi (1, 2, 4 ...)
+  dealerId?: string; // 108: joriy qo'lni tarqatgan o'yinchi
 }

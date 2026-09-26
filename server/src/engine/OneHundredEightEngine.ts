@@ -12,6 +12,8 @@ export class OneHundredEightEngine extends BaseEngine {
   public roundSummary?: RoundSummary;
   // Joriy navbatda bozordan karta olinganmi (pas faqat karta olingandan keyin mumkin)
   public hasDrawnThisTurn: boolean = false;
+  // Joriy qo'lni tarqatgan o'yinchi; undan keyingi o'yinchi birinchi yuradi
+  public dealerIndex: number = -1;
 
   constructor(roomId: string, settings: RoomSettings) {
     super(roomId, settings);
@@ -22,6 +24,7 @@ export class OneHundredEightEngine extends BaseEngine {
     super.initGame();
     this.roundNumber = 1;
     this.roundSummary = undefined;
+    this.dealerIndex = -1;
 
     for (const p of this.players) {
       p.penaltyPoints = 0;
@@ -42,9 +45,13 @@ export class OneHundredEightEngine extends BaseEngine {
       player.isFolded = player.isEliminated || false;
     }
 
-    // Faqat o'yinda qolganlarga 4 tadan karta tarqatiladi (chiqib ketganlarga emas)
+    this.dealerIndex = this.chooseDealer();
+    const n = this.players.length;
+
+    // Faqat o'yinda qolganlarga 4 tadan karta tarqatiladi (chiqib ketganlarga emas), tarqatuvchidan keyingisidan boshlab
     for (let round = 0; round < 4; round++) {
-      for (const player of this.players) {
+      for (let step = 1; step <= n; step++) {
+        const player = this.players[(this.dealerIndex + step) % n];
         if (!player.isEliminated && this.deck.length > 0) {
           player.hand.push(this.deck.shift()!);
         }
@@ -63,12 +70,35 @@ export class OneHundredEightEngine extends BaseEngine {
       this.activeSuit = this.topDiscardCard.suit;
     }
 
-    // Navbatni birinchi faol o'yinchiga beramiz
-    this.activePlayerIndex = this.players.findIndex(p => !p.isEliminated);
-    if (this.activePlayerIndex === -1) this.activePlayerIndex = 0;
+    // Tarqatuvchidan keyingi o'yinchi birinchi yuradi
+    this.activePlayerIndex = this.dealerIndex;
+    this.activePlayerIndex = this.getNextActivePlayerIndex();
     this.status = 'PLAYING';
     this.roundSummary = undefined;
     this.updatePlayerTurns();
+  }
+
+  // Tarqatuvchi: 1-qo'lda 1-o'rindiqdagi o'yinchi; keyin eng ko'p ochko to'plagan (yutqazayotgan) o'yinchi.
+  // Ochkolar teng bo'lsa - oldingi tarqatuvchidan keyin birinchi kelgani.
+  private chooseDealer(): number {
+    const n = this.players.length;
+    const active = this.players.map((p, i) => ({ p, i })).filter(x => !x.p.isEliminated);
+    if (active.length === 0) return 0;
+    if (this.dealerIndex === -1) return active[0].i;
+
+    const maxPoints = Math.max(...active.map(x => x.p.penaltyPoints));
+    for (let step = 1; step <= n; step++) {
+      const idx = (this.dealerIndex + step) % n;
+      const player = this.players[idx];
+      if (!player.isEliminated && player.penaltyPoints === maxPoints) return idx;
+    }
+    return active[0].i;
+  }
+
+  // Qo'lda qolgan karta jarimasi: Qarg'a (♠) damasi 40, boshqa damalar 20, qolganlari jadval bo'yicha
+  public static cardPenalty(card: Card): number {
+    if (card.rank === 'Q') return card.suit === 'SPADES' ? 40 : 20;
+    return ONE_HUNDRED_EIGHT_POINTS[card.rank] || 0;
   }
 
   // Karta tashlash mumkinligini tekshirish
@@ -138,7 +168,7 @@ export class OneHundredEightEngine extends BaseEngine {
 
     // Raund g'alabasini tekshirish (Qo'lda karta qolmadi)
     if (player.hand.length === 0) {
-      this.resolveRoundEnd(player.id);
+      this.resolveRoundEnd(player.id, card);
       return { success: true, message: `🎉 ${player.username} barcha kartalaridan qutulib, raundda g'olib bo'ldi!` };
     }
 
@@ -326,15 +356,20 @@ export class OneHundredEightEngine extends BaseEngine {
   }
 
   // Raund yakuni, ochkolarni ochiq sanash va 108 dan oshganlarni chiqarish
-  private resolveRoundEnd(roundWinnerId: string): void {
+  // Raund darhol tugaydi (oxirgi 6/7/Qirol ning jarimasi keyingi o'yinchiga o'tmaydi).
+  // Oxirgi karta dama bo'lsa, chiqib ketgan o'yinchining ochkosidan ayriladi: ♠ dama -40, boshqa dama -20
+  // (ochko manfiy bo'lishi ham mumkin).
+  private resolveRoundEnd(roundWinnerId: string, lastCard?: Card): void {
     this.winnerId = roundWinnerId;
     const results: RoundPlayerResult[] = [];
 
     for (const player of this.players) {
       let roundPenalty = 0;
-      if (player.id !== roundWinnerId && !player.isEliminated) {
+      if (player.id === roundWinnerId) {
+        if (lastCard?.rank === 'Q') roundPenalty = -OneHundredEightEngine.cardPenalty(lastCard);
+      } else if (!player.isEliminated) {
         for (const card of player.hand) {
-          roundPenalty += ONE_HUNDRED_EIGHT_POINTS[card.rank] || 0;
+          roundPenalty += OneHundredEightEngine.cardPenalty(card);
         }
       }
 
@@ -389,6 +424,7 @@ export class OneHundredEightEngine extends BaseEngine {
       ...super.getTableState(),
       // Onlayn klient jarima zanjirini ko'rsatishi uchun (ilgari faqat lokal rejimda ko'rinardi)
       pendingPenaltyCount: this.pendingPenaltyCards,
+      dealerId: this.players[this.dealerIndex]?.id,
       roundSummary: this.roundSummary,
     };
   }

@@ -326,6 +326,7 @@ Tuz (11 ochko) > 10 (10 ochko) > Korol (4 ochko) > Dama (3 ochko) > Valet (2 och
 • ⚡ <b>Bura:</b> 4 ta Kozir — raund g'olibi (61 ochko)!
 • 🔨 <b>Molodka:</b> 4 ta bir xil nokozir mast — navbatsiz tashlanadi!
 • 🎯 <b>41+ ochko:</b> Bir yurishda 41 dan ortiq ochkolik kartalar bilan yurish.
+• 🥚 <b>Tuxum:</b> Ochkolar teng bo'lsa qo'l qayta tarqatiladi, keyingi jarimalar x2 (yana tuxum - x4).
 
 🔹 <b>Birinchi yurish:</b>
 1-qo'lda eng kichik kozirga ega o'yinchi yuradi. Keyingi qo'llarda yutgan o'yinchi boshlaydi.`;
