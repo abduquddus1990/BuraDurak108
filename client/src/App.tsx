@@ -4,7 +4,7 @@ import { Card } from '../../shared/src/types/card';
 import { ChatMessage } from '../../shared/src/types/chat';
 import { UserProfile, FriendItem, OnlineUserInfo, TableInvitation } from '../../shared/src/types/social';
 import { TableThemeId, AppBackgroundId, CardBackId, APP_BACKGROUNDS, TABLE_THEMES } from './types/theme';
-import { LobbyView } from './components/Lobby/LobbyView';
+import { LobbyView, TableSetup } from './components/Lobby/LobbyView';
 import { XontaxtaView } from './components/Table/XontaxtaView';
 import { ProfileDrawer } from './components/Social/ProfileDrawer';
 import { FriendsDrawer } from './components/Social/FriendsDrawer';
@@ -169,6 +169,10 @@ export function App() {
   const [connectionStatus, setConnectionStatus] = useState<'connected' | 'reconnecting'>('connected');
   const [hint, setHint] = useState<{ cardIds: string[]; version: number }>({ cardIds: [], version: 0 });
   const [isRulesOpen, setIsRulesOpen] = useState(false);
+  // Tez o'yin: navbatda kutish holati (null - navbatda emas)
+  const [quickMatch, setQuickMatch] = useState<{ waiting: number; needed: number; botFillInMs: number } | null>(null);
+  // Do'stlar stoli uchun tanlangan sozlamalar
+  const [selectedInviteSetup, setSelectedInviteSetup] = useState<TableSetup | undefined>(undefined);
 
   const [localEngine, setLocalEngine] = useState<any>(null);
 
@@ -260,6 +264,9 @@ export function App() {
           setInfoNotice(`Reyting: ${sign}${data.ratingDelta} (ELO ${data.profile.ratingElo})`);
         }
       }
+      if (data.type === 'QUICK_MATCH_STATUS') {
+        setQuickMatch(data.status || null);
+      }
       if (data.type === 'HINT') {
         setInfoNotice(data.message);
         setHint((prev) => ({ cardIds: data.cardIds || [], version: prev.version + 1 }));
@@ -293,6 +300,8 @@ export function App() {
         setActiveRoomId(data.roomId);
       }
       if (data.type === 'ROOM_JOINED') {
+        setQuickMatch(null);
+        setChatMessages([]);
         setActiveRoomId(data.roomId);
         setView('GAME');
         setIsInviteFriendsOpen(false);
@@ -336,19 +345,20 @@ export function App() {
     }
   }, [chatCooldown]);
 
-  const handleStartGame = (gameType: GameType, rules: GameRules, totalPlayers: number, _isBot: boolean) => {
+  const handleStartGame = (gameType: GameType, rules: GameRules, totalPlayers: number, _isBot: boolean, setup?: TableSetup) => {
     setChatMessages([]);
     setLocalEngine(null);
     if (gameClient.isConnected()) {
-      gameClient.createBotRoom(currentUser.id, currentUser.displayName, gameType, rules, totalPlayers);
+      gameClient.createBotRoom(currentUser.id, currentUser.displayName, gameType, rules, totalPlayers, setup?.options);
       setView('GAME');
     } else {
-      startLocalGame(gameType, rules, totalPlayers);
+      startLocalGame(gameType, rules, totalPlayers, setup);
     }
   };
 
-  const startLocalGame = (gameType: GameType, rules: GameRules, totalPlayers: number) => {
+  const startLocalGame = (gameType: GameType, rules: GameRules, totalPlayers: number, setup?: TableSetup) => {
     const settings = {
+      options: setup?.options,
       id: `local_room_${Date.now()}`,
       gameType,
       rules,
@@ -608,7 +618,35 @@ export function App() {
     }
   };
 
-  const handleOpenFriendsTable = (gameType: GameType, rules: GameRules, totalPlayers: number) => {
+  // Tez o'yin: server o'xshash reytingli raqiblarni topadi (30 soniyada topilmasa botlar qo'shiladi)
+  const handleQuickMatch = (gameType: GameType, rules: GameRules, totalPlayers: number) => {
+    if (!gameClient.isConnected()) {
+      setActionError("Tez o'yin uchun serverga ulanish kerak");
+      return;
+    }
+    setQuickMatch({ waiting: 1, needed: totalPlayers, botFillInMs: 30000 });
+    gameClient.quickMatchJoin(gameType, rules, totalPlayers);
+  };
+
+  const handleCancelQuickMatch = () => {
+    gameClient.quickMatchLeave();
+    setQuickMatch(null);
+  };
+
+  // "Yana bir partiya": lokal o'yinda darhol, onlayn - hamma rozi bo'lgach
+  const handleRematch = () => {
+    if (localEngine) {
+      localEngine.initGame();
+      setTableState(localEngine.getTableState());
+      setHand(sortHand(localEngine.getPlayerHand(currentUser.id), localEngine.trumpSuit, localEngine instanceof BuraEngine));
+      checkAndTriggerLocalBot(localEngine);
+    } else if (gameClient.isConnected()) {
+      gameClient.sendGameAction('REMATCH', {});
+    }
+  };
+
+  const handleOpenFriendsTable = (gameType: GameType, rules: GameRules, totalPlayers: number, setup?: TableSetup) => {
+    setSelectedInviteSetup(setup);
     setSelectedInviteGame(gameType);
     setSelectedInviteRules(rules);
     setSelectedInvitePlayerCount(totalPlayers);
@@ -625,7 +663,8 @@ export function App() {
         gameType,
         rules,
         totalPlayers,
-        newRoomId
+        newRoomId,
+        setup
       );
     }
   };
@@ -684,6 +723,29 @@ export function App() {
         </div>
       )}
 
+      {quickMatch && (
+        <div className="fixed inset-0 z-[105] bg-black/80 backdrop-blur-md flex items-center justify-center p-4">
+          <div className="w-full max-w-xs bg-stone-900 border-2 border-emerald-500 rounded-3xl p-5 flex flex-col items-center gap-3 text-center anim-pop">
+            <div className="w-12 h-12 rounded-full border-4 border-emerald-400 border-t-transparent animate-spin" />
+            <h3 className="text-sm font-black text-emerald-200">Raqiblar qidirilmoqda...</h3>
+            <p className="text-xs text-stone-300">
+              Navbatda: <b className="text-amber-200">{quickMatch.waiting}</b> / {quickMatch.needed} o'yinchi
+            </p>
+            <p className="text-[11px] text-stone-400">
+              {quickMatch.botFillInMs > 0
+                ? `${Math.ceil(quickMatch.botFillInMs / 1000)} soniyada topilmasa, bo'sh o'rinlarga botlar qo'shiladi`
+                : "Bo'sh o'rinlarga botlar qo'shilmoqda..."}
+            </p>
+            <button
+              onClick={handleCancelQuickMatch}
+              className="w-full py-2 rounded-xl bg-stone-800 border border-stone-700 text-stone-200 text-xs font-bold hover:bg-stone-700"
+            >
+              Bekor qilish
+            </button>
+          </div>
+        </div>
+      )}
+
       {infoNotice && (
         <div className="fixed top-16 left-1/2 -translate-x-1/2 z-[110] max-w-[90%] px-4 py-2 rounded-2xl bg-emerald-950/95 border border-emerald-500 text-emerald-100 text-xs font-bold shadow-2xl text-center">
           {infoNotice}
@@ -716,6 +778,7 @@ export function App() {
           onOpenSettings={() => setIsSettingsOpen(true)}
           onOpenLeaderboard={handleOpenLeaderboard}
           onOpenRules={() => setIsRulesOpen(true)}
+          onQuickMatch={handleQuickMatch}
           onOpenTheme={() => setIsThemeOpen(true)}
           onOpenAuth={() => {
             setAuthPromptMessage(undefined);
@@ -741,6 +804,7 @@ export function App() {
             onReadyNextRound={handleReadyNextRound}
             hintCardIds={hint.cardIds}
             hintVersion={hint.version}
+            onRematch={handleRematch}
             onRequestHint={tableState.players.filter((p) => !p.isBot).length <= 1 ? handleRequestHint : undefined}
             onStartWithBots={() => {
               if (tableState.roomId && gameClient.isConnected()) {
@@ -781,7 +845,8 @@ export function App() {
               selectedInviteGame,
               selectedInviteRules,
               selectedInvitePlayerCount,
-              newRoomId
+              newRoomId,
+              selectedInviteSetup
             );
           }
         }}
@@ -809,7 +874,8 @@ export function App() {
                 selectedInviteGame,
                 selectedInviteRules,
                 selectedInvitePlayerCount,
-                roomIdToUse
+                roomIdToUse,
+                selectedInviteSetup
               );
             }
           }

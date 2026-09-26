@@ -1,14 +1,29 @@
 import React, { useState, useEffect } from 'react';
-import { GameType, BuraRules, DurakRules, OneHundredEightRules, GameRules } from '../../../../shared/src/types/game';
+import { GameType, BuraRules, DurakRules, OneHundredEightRules, GameRules, RoomOptions, BotLevel } from '../../../../shared/src/types/game';
 import { UserProfile } from '../../../../shared/src/types/social';
-import { Bot, Users, Trophy, Shield, Settings, Palette, LogIn, BookOpen } from 'lucide-react';
+import { Bot, Users, Trophy, Shield, Settings, Palette, LogIn, BookOpen, Zap, SlidersHorizontal } from 'lucide-react';
 import { triggerHaptic } from '../../services/telegramSdk';
+
+// Stol sozlamalari: o'yin qoidalaridagi choyxona farqlari, navbat vaqti va bot darajasi
+export interface TableSetup {
+  options: RoomOptions;
+  turnSeconds: number;
+}
+
+const loadSetup = (): TableSetup => {
+  try {
+    const saved = JSON.parse(localStorage.getItem('choyxona_table_setup') || 'null');
+    if (saved && saved.options) return saved;
+  } catch (e) {}
+  return { options: { eggRule: true, loneQueenBonus: true, botLevel: 'MEDIUM' }, turnSeconds: 30 };
+};
 
 interface LobbyViewProps {
   profile: UserProfile;
   isNightMode: boolean;
-  onStartGame: (gameType: GameType, rules: GameRules, totalPlayers: number, isBot: boolean) => void;
-  onOpenFriendsTable: (gameType: GameType, rules: GameRules, totalPlayers: number) => void;
+  onStartGame: (gameType: GameType, rules: GameRules, totalPlayers: number, isBot: boolean, setup: TableSetup) => void;
+  onOpenFriendsTable: (gameType: GameType, rules: GameRules, totalPlayers: number, setup: TableSetup) => void;
+  onQuickMatch?: (gameType: GameType, rules: GameRules, totalPlayers: number) => void;
   onOpenProfile: () => void;
   onOpenFriends: () => void;
   onOpenClans: () => void;
@@ -32,7 +47,18 @@ export const LobbyView: React.FC<LobbyViewProps> = ({
   onOpenTheme,
   onOpenAuth,
   onOpenRules,
+  onQuickMatch,
 }) => {
+  const [setup, setSetup] = useState<TableSetup>(loadSetup);
+  const [isSetupOpen, setIsSetupOpen] = useState(false);
+  const updateSetup = (next: TableSetup) => {
+    setSetup(next);
+    try {
+      localStorage.setItem('choyxona_table_setup', JSON.stringify(next));
+    } catch (e) {}
+  };
+  const setOption = <K extends keyof RoomOptions>(key: K, value: RoomOptions[K]) =>
+    updateSetup({ ...setup, options: { ...setup.options, [key]: value } });
   const [selectedGame, setSelectedGame] = useState<GameType>('BURA');
   const [selectedBuraRule, setSelectedBuraRule] = useState<BuraRules>('ODDIY');
   const [selectedDurakRule, setSelectedDurakRule] = useState<DurakRules>('PEREKIDLI');
@@ -74,7 +100,7 @@ export const LobbyView: React.FC<LobbyViewProps> = ({
 
   const handleStart = (isBot: boolean) => {
     triggerHaptic('medium');
-    onStartGame(selectedGame, getSelectedRules(), playerCount, isBot);
+    onStartGame(selectedGame, getSelectedRules(), playerCount, isBot, setup);
   };
 
   return (
@@ -309,8 +335,80 @@ export const LobbyView: React.FC<LobbyViewProps> = ({
         </div>
       </div>
 
+      {/* 4.1 Stol sozlamalari */}
+      <div className="mb-3 text-left">
+        <button
+          onClick={() => setIsSetupOpen((v) => !v)}
+          className="w-full flex items-center justify-between px-3 py-2 rounded-xl bg-stone-900/60 border border-stone-800 text-xs font-bold text-amber-300/90"
+        >
+          <span className="flex items-center gap-1.5">
+            <SlidersHorizontal className="w-3.5 h-3.5" /> Stol sozlamalari
+          </span>
+          <span className="text-[10px] text-stone-400 font-semibold">
+            {setup.turnSeconds}s · bot: {setup.options.botLevel === 'EASY' ? 'yengil' : setup.options.botLevel === 'HARD' ? 'usta' : "o'rtacha"} {isSetupOpen ? '▲' : '▼'}
+          </span>
+        </button>
+        {isSetupOpen && (
+          <div className="mt-1.5 p-3 rounded-xl bg-stone-900/80 border border-stone-800 flex flex-col gap-2.5 text-xs">
+            <div className="flex items-center justify-between gap-2">
+              <span className="text-stone-300">⏱ Yurish vaqti (do'stlar bilan)</span>
+              <div className="flex gap-1">
+                {[15, 30, 60].map((sec) => (
+                  <button
+                    key={sec}
+                    onClick={() => updateSetup({ ...setup, turnSeconds: sec })}
+                    className={`px-2 py-1 rounded-lg border text-[11px] font-bold ${setup.turnSeconds === sec ? 'border-amber-400 bg-amber-950 text-amber-200' : 'border-stone-700 text-stone-400'}`}
+                  >
+                    {sec}s
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div className="flex items-center justify-between gap-2">
+              <span className="text-stone-300">🤖 Bot darajasi</span>
+              <div className="flex gap-1">
+                {([['EASY', 'Yengil'], ['MEDIUM', "O'rtacha"], ['HARD', 'Usta']] as [BotLevel, string][]).map(([level, label]) => (
+                  <button
+                    key={level}
+                    onClick={() => setOption('botLevel', level)}
+                    className={`px-2 py-1 rounded-lg border text-[11px] font-bold ${setup.options.botLevel === level ? 'border-amber-400 bg-amber-950 text-amber-200' : 'border-stone-700 text-stone-400'}`}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+            </div>
+            {selectedGame === 'BURA' && (
+              <label className="flex items-center justify-between gap-2 cursor-pointer">
+                <span className="text-stone-300">🥚 Tuxum qoidasi (teng ochkoda jarima x2)</span>
+                <input type="checkbox" className="w-4 h-4 accent-amber-500" checked={setup.options.eggRule !== false} onChange={(e) => setOption('eggRule', e.target.checked)} />
+              </label>
+            )}
+            {selectedGame === 'ONE_HUNDRED_EIGHT' && (
+              <label className="flex items-center justify-between gap-2 cursor-pointer">
+                <span className="text-stone-300">👸 Yolg'iz dama 20/40 (chiqishda minus)</span>
+                <input type="checkbox" className="w-4 h-4 accent-amber-500" checked={setup.options.loneQueenBonus !== false} onChange={(e) => setOption('loneQueenBonus', e.target.checked)} />
+              </label>
+            )}
+            <span className="text-[10px] text-stone-500">Tez o'yinda standart qoidalar ishlatiladi.</span>
+          </div>
+        )}
+      </div>
+
       {/* 5. Start Tugmalari */}
       <div className="flex flex-col gap-2 mt-auto">
+        {onQuickMatch && (
+          <button
+            onClick={() => {
+              triggerHaptic('medium');
+              onQuickMatch(selectedGame, getSelectedRules(), playerCount);
+            }}
+            className="w-full py-3 rounded-2xl bg-gradient-to-r from-emerald-500 to-green-600 text-stone-950 font-black text-sm shadow-xl hover:brightness-110 active:scale-[0.98] transition flex items-center justify-center gap-2"
+          >
+            <Zap className="w-5 h-5" />
+            <span>Tez O'yin (Raqib Qidirish)</span>
+          </button>
+        )}
         <button
           onClick={() => handleStart(true)}
           className="w-full py-3 rounded-2xl bg-gradient-to-r from-amber-500 to-yellow-600 text-stone-950 font-black text-sm shadow-xl hover:brightness-110 active:scale-[0.98] transition flex items-center justify-center gap-2"
@@ -322,7 +420,7 @@ export const LobbyView: React.FC<LobbyViewProps> = ({
         <button
           onClick={() => {
             triggerHaptic('medium');
-            onOpenFriendsTable(selectedGame, getSelectedRules(), playerCount);
+            onOpenFriendsTable(selectedGame, getSelectedRules(), playerCount, setup);
           }}
           className="w-full py-2.5 rounded-2xl bg-stone-900 border border-amber-600/40 text-amber-300 font-bold text-xs shadow hover:bg-stone-800 active:scale-[0.98] transition flex items-center justify-center gap-2"
         >

@@ -7,12 +7,13 @@ import cors from 'cors';
 import { WebSocketServer, WebSocket } from 'ws';
 import { RoomManager } from './rooms/RoomManager';
 import { GameRoom } from './rooms/GameRoom';
+import { Matchmaker, QueueEntry } from './rooms/Matchmaker';
 import { loadEnv } from './utils/env';
 import { TelegramBot } from './bot/TelegramBot';
 import { verifyTelegramInitData } from './auth/telegramAuth';
 import { UserStore, StoredUser } from './store/UserStore';
 import { OnlineUserInfo, TableInvitation, UserProfile } from '../../shared/src/types/social';
-import { GameType, GameRules } from '../../shared/src/types/game';
+import { GameType, GameRules, RoomOptions, BotLevel, TURN_SECONDS_OPTIONS } from '../../shared/src/types/game';
 
 // .env faylini yuklash
 loadEnv();
@@ -127,6 +128,17 @@ const validateRoomOptions = (
   return { gameType, rules, totalPlayers: count };
 };
 
+// Stol sozlamalari (mezbon tanlaydi). Noma'lum qiymatlar e'tiborsiz qoldiriladi.
+const BOT_LEVELS: BotLevel[] = ['EASY', 'MEDIUM', 'HARD'];
+const parseTableOptions = (raw: any): { options: RoomOptions; turnSeconds?: number } => {
+  const options: RoomOptions = {};
+  if (typeof raw?.eggRule === 'boolean') options.eggRule = raw.eggRule;
+  if (typeof raw?.loneQueenBonus === 'boolean') options.loneQueenBonus = raw.loneQueenBonus;
+  if (BOT_LEVELS.includes(raw?.botLevel)) options.botLevel = raw.botLevel;
+  const turnSeconds = (TURN_SECONDS_OPTIONS as readonly number[]).includes(raw?.turnSeconds) ? raw.turnSeconds : undefined;
+  return { options, turnSeconds };
+};
+
 // Onlayn foydalanuvchilar sessiyasi
 interface ConnectedUserSession {
   info: OnlineUserInfo;
@@ -134,6 +146,37 @@ interface ConnectedUserSession {
 }
 
 const onlineUsers = new Map<string, ConnectedUserSession>();
+
+// playerId -> shu o'yinchining ulanishi (tez o'yin topilganda uni stolga o'tkazish uchun)
+interface PlayerConnection {
+  ws: WebSocket;
+  joinRoom: (room: GameRoom) => boolean;
+}
+const connections = new Map<string, PlayerConnection>();
+
+// --- Tez o'yin (raqib qidirish) ---
+const matchmaker = new Matchmaker(
+  (entries: QueueEntry[], fillWithBots: boolean) => {
+    const first = entries[0];
+    const room = roomManager.createEmptyMultiplayerRoom(first.gameType, first.rules, first.totalPlayers);
+    for (const entry of entries) {
+      connections.get(entry.playerId)?.joinRoom(room);
+    }
+    if (room.engine.players.length === 0) {
+      roomManager.removeRoom(room.id);
+      return;
+    }
+    if (room.engine.status === 'WAITING' && (fillWithBots || room.engine.players.length < first.totalPlayers)) {
+      room.fillRemainingWithBots();
+    }
+  },
+  (entries: QueueEntry[]) => {
+    for (const entry of entries) {
+      const conn = connections.get(entry.playerId);
+      if (conn) sendTo(conn.ws, { type: 'QUICK_MATCH_STATUS', status: matchmaker.statusFor(entry.playerId) });
+    }
+  }
+);
 
 const sendTo = (ws: WebSocket, data: any) => {
   if (ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify(data));
@@ -207,6 +250,19 @@ wss.on('connection', (ws: WebSocket) => {
     currentRoomId = null;
   };
 
+  // Tashqaridan (tez o'yin topilganda) shu ulanishni stolga qo'shish
+  const joinRoomFromOutside = (room: GameRoom): boolean => {
+    if (!currentPlayerId) return false;
+    leaveCurrentRoom(room.id);
+    const joined = room.addPlayer(currentPlayerId, displayNameOf(currentPlayerId), false, sender, avatarOf(currentPlayerId));
+    if (!joined) return false;
+    currentRoomId = room.id;
+    setUserStatus(currentPlayerId, room.id);
+    sender({ type: 'ROOM_JOINED', roomId: room.id, settings: room.settings });
+    room.broadcastState();
+    return true;
+  };
+
   const handleRegister = (payload: any) => {
     const { initData, guestId, guestToken, displayName } = payload || {};
     let user: StoredUser;
@@ -243,6 +299,7 @@ wss.on('connection', (ws: WebSocket) => {
       if (onlineUsers.get(currentPlayerId)?.ws === ws) onlineUsers.delete(currentPlayerId);
     }
     currentPlayerId = user.id;
+    connections.set(user.id, { ws, joinRoom: joinRoomFromOutside });
 
     onlineUsers.set(user.id, {
       info: {
@@ -291,6 +348,12 @@ wss.on('connection', (ws: WebSocket) => {
       if (!requireSession()) return;
       const playerId = currentPlayerId!;
 
+      // Stol ochsa yoki boshqa stolga kirsa - tez o'yin navbatidan chiqariladi
+      if ((type === 'CREATE_BOT_ROOM' || type === 'CREATE_MULTIPLAYER_ROOM' || type === 'JOIN_ROOM') && matchmaker.isQueued(playerId)) {
+        matchmaker.leave(playerId);
+        sender({ type: 'QUICK_MATCH_STATUS', status: null });
+      }
+
       // 0.3 Ko'rinadigan ismni o'zgartirish
       if (type === 'SET_DISPLAY_NAME') {
         const name = sanitizeName(payload.displayName);
@@ -321,7 +384,8 @@ wss.on('connection', (ws: WebSocket) => {
           options.rules,
           options.totalPlayers,
           sender,
-          avatarOf(playerId)
+          avatarOf(playerId),
+          parseTableOptions(payload.options).options
         );
         currentRoomId = room.id;
         setUserStatus(playerId, room.id);
@@ -337,6 +401,7 @@ wss.on('connection', (ws: WebSocket) => {
           return;
         }
         const clientRoomId = payload.roomId;
+        const tableOptions = parseTableOptions(payload.options);
 
         // Mezbon o'zi turgan stolni qayta ochsa - o'sha stol qaytariladi.
         // Boshqa birovning stoli ID si bilan to'qnashsa - yangi ID beriladi (eski stolni ustidan yozib yubormaslik uchun).
@@ -358,13 +423,39 @@ wss.on('connection', (ws: WebSocket) => {
             options.totalPlayers,
             sender,
             safeRoomId,
-            avatarOf(playerId)
+            avatarOf(playerId),
+            tableOptions.options,
+            tableOptions.turnSeconds
           );
         }
         currentRoomId = room.id;
         setUserStatus(playerId, room.id);
         sender({ type: 'ROOM_CREATED', roomId: room.id, settings: room.settings });
         room.broadcastState();
+        return;
+      }
+
+      // 1.1.1 Tez o'yin: navbatga turish / chiqish
+      if (type === 'QUICK_MATCH_JOIN') {
+        const options = validateRoomOptions(payload.gameType, payload.rules, payload.totalPlayers);
+        if (!options) {
+          sender({ type: 'ERROR', message: "Noto'g'ri o'yin sozlamalari!" });
+          return;
+        }
+        leaveCurrentRoom();
+        setUserStatus(playerId, null);
+        matchmaker.join({
+          playerId,
+          elo: userStore.get(playerId)?.ratingElo ?? 1000,
+          gameType: options.gameType,
+          rules: options.rules,
+          totalPlayers: options.totalPlayers,
+        });
+        return;
+      }
+      if (type === 'QUICK_MATCH_LEAVE') {
+        matchmaker.leave(playerId);
+        sender({ type: 'QUICK_MATCH_STATUS', status: null });
         return;
       }
 
@@ -538,6 +629,10 @@ wss.on('connection', (ws: WebSocket) => {
       // Shu foydalanuvchi boshqa oynadan qayta ulangan bo'lsa, uning yangi sessiyasini o'chirib yubormaslik
       if (onlineUsers.get(currentPlayerId)?.ws === ws) {
         onlineUsers.delete(currentPlayerId);
+      }
+      if (connections.get(currentPlayerId)?.ws === ws) {
+        connections.delete(currentPlayerId);
+        matchmaker.leave(currentPlayerId);
       }
       if (currentRoomId) {
         roomManager.getRoom(currentRoomId)?.removePlayer(currentPlayerId, sender);

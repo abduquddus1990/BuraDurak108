@@ -44,6 +44,22 @@ export abstract class BaseEngine {
   }
 
   public initGame(): void {
+    // Yangi partiya (shu jumladan "Yana bir partiya") - oldingi o'yindan hech narsa qolmasligi kerak
+    for (const player of this.players) {
+      player.hand = [];
+      player.score = 0;
+      player.penaltyPoints = 0;
+      player.isFolded = false;
+      player.isEliminated = false;
+      player.wonCards = [];
+      player.cardsCount = 0;
+    }
+    this.winnerId = undefined;
+    this.specialCombinationAlert = null;
+    this.isLastTrumpRevealed = false;
+    this.revealedTrumpCard = undefined;
+    this.activeSuit = undefined;
+
     this.deck = this.createAndShuffleDeck();
     this.trumpCard = this.deck[this.deck.length - 1];
     this.trumpSuit = this.trumpCard.suit;

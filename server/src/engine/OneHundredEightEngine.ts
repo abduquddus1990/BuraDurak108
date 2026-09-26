@@ -103,8 +103,8 @@ export class OneHundredEightEngine extends BaseEngine {
 
   // Qo'lda qolgan kartalar jarimasi. Dama faqat qo'lda yolg'iz o'zi qolsa 20/40 hisoblanadi;
   // yonida boshqa kartalar ham bo'lsa - oddiy 3 ochko.
-  public static handPenalty(hand: Card[]): number {
-    if (hand.length === 1 && hand[0].rank === 'Q') return OneHundredEightEngine.loneQueenValue(hand[0]);
+  public static handPenalty(hand: Card[], loneQueenBonus: boolean = true): number {
+    if (loneQueenBonus && hand.length === 1 && hand[0].rank === 'Q') return OneHundredEightEngine.loneQueenValue(hand[0]);
     return hand.reduce((sum, c) => sum + (ONE_HUNDRED_EIGHT_POINTS[c.rank] || 0), 0);
   }
 
@@ -356,12 +356,14 @@ export class OneHundredEightEngine extends BaseEngine {
     this.winnerId = roundWinnerId;
     const results: RoundPlayerResult[] = [];
 
+    // Stol sozlamasida o'chirilgan bo'lsa - dama har doim 3 ochko, chiqishda minus yo'q
+    const loneQueenBonus = this.settings.options?.loneQueenBonus !== false;
     for (const player of this.players) {
       let roundPenalty = 0;
       if (player.id === roundWinnerId) {
-        if (lastCard?.rank === 'Q') roundPenalty = -OneHundredEightEngine.loneQueenValue(lastCard);
+        if (loneQueenBonus && lastCard?.rank === 'Q') roundPenalty = -OneHundredEightEngine.loneQueenValue(lastCard);
       } else if (!player.isEliminated) {
-        roundPenalty = OneHundredEightEngine.handPenalty(player.hand);
+        roundPenalty = OneHundredEightEngine.handPenalty(player.hand, loneQueenBonus);
       }
 
       player.penaltyPoints += roundPenalty;

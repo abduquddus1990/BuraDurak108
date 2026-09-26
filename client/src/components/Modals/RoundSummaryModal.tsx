@@ -10,6 +10,9 @@ interface RoundSummaryModalProps {
   gameType: string;
   onReadyNext: () => void;
   onLeaveRoom: () => void;
+  onRematch?: () => void;
+  rematchVotes?: string[];
+  humanCount?: number;
 }
 
 export const RoundSummaryModal: React.FC<RoundSummaryModalProps> = ({
@@ -18,6 +21,9 @@ export const RoundSummaryModal: React.FC<RoundSummaryModalProps> = ({
   gameType,
   onReadyNext,
   onLeaveRoom,
+  onRematch,
+  rematchVotes = [],
+  humanCount = 1,
 }) => {
   if (!roundSummary) return null;
 
@@ -164,12 +170,25 @@ export const RoundSummaryModal: React.FC<RoundSummaryModalProps> = ({
               )}
             </button>
           ) : (
-            <button
-              onClick={onLeaveRoom}
-              className="w-full py-3 rounded-2xl bg-gradient-to-r from-amber-500 to-yellow-600 text-stone-950 font-black text-xs shadow-lg hover:brightness-110"
-            >
-              Asosiy Menyuga Qaytish
-            </button>
+            <>
+              {onRematch && (
+                <button
+                  onClick={onRematch}
+                  disabled={rematchVotes.includes(currentUserId)}
+                  className="w-full py-3 rounded-2xl bg-gradient-to-r from-emerald-600 to-green-600 text-white font-black text-xs shadow-lg hover:brightness-110 disabled:opacity-60"
+                >
+                  {rematchVotes.includes(currentUserId)
+                    ? `🔁 Boshqalar kutilmoqda (${rematchVotes.length}/${humanCount})`
+                    : `🔁 Yana bir partiya${rematchVotes.length > 0 ? ` (${rematchVotes.length}/${humanCount} tayyor)` : ''}`}
+                </button>
+              )}
+              <button
+                onClick={onLeaveRoom}
+                className="w-full py-3 rounded-2xl bg-gradient-to-r from-amber-500 to-yellow-600 text-stone-950 font-black text-xs shadow-lg hover:brightness-110"
+              >
+                Asosiy Menyuga Qaytish
+              </button>
+            </>
           )}
 
           {!roundSummary.isGameOver && (

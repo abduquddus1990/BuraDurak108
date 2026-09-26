@@ -1,5 +1,5 @@
 import { GameRoom, SocketSender } from './GameRoom';
-import { RoomSettings, GameType, GameRules } from '../../../shared/src/types/game';
+import { RoomSettings, GameType, GameRules, RoomOptions } from '../../../shared/src/types/game';
 import { ChatManager } from '../chat/ChatManager';
 
 // Hech kim ulanmagan stol shuncha vaqtdan so'ng o'chiriladi (qayta ulanish uchun imkon qoldiriladi)
@@ -46,7 +46,8 @@ export class RoomManager {
     rules: GameRules,
     totalPlayers: number,
     sender: SocketSender,
-    avatarUrl?: string
+    avatarUrl?: string,
+    options?: RoomOptions
   ): GameRoom {
     const roomId = `room_bot_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
     const settings: RoomSettings = {
@@ -57,6 +58,7 @@ export class RoomManager {
       turnTimeoutSeconds: 15,
       isPrivate: true,
       deckType: '36',
+      options,
     };
 
     const room = this.createRoom(settings);
@@ -83,23 +85,37 @@ export class RoomManager {
     totalPlayers: number,
     sender: SocketSender,
     customRoomId?: string,
-    avatarUrl?: string
+    avatarUrl?: string,
+    options?: RoomOptions,
+    turnTimeoutSeconds: number = MULTIPLAYER_TURN_SECONDS
+  ): GameRoom {
+    const room = this.createEmptyMultiplayerRoom(gameType, rules, totalPlayers, options, turnTimeoutSeconds, customRoomId);
+    room.settings.isPrivate = true; // Do'stlar stoli - faqat taklif/havola orqali
+    // Mezbonni 1-o'yinchiga qo'shish
+    room.addPlayer(hostId, hostName, false, sender, avatarUrl);
+    return room;
+  }
+
+  // O'yinchilarsiz stol (tez o'yin: topilgan o'yinchilar keyin birma-bir qo'shiladi)
+  public createEmptyMultiplayerRoom(
+    gameType: GameType,
+    rules: GameRules,
+    totalPlayers: number,
+    options?: RoomOptions,
+    turnTimeoutSeconds: number = MULTIPLAYER_TURN_SECONDS,
+    customRoomId?: string
   ): GameRoom {
     const roomId = customRoomId || `room_fr_${Math.random().toString(36).substring(2, 8)}`;
-    const settings: RoomSettings = {
+    return this.createRoom({
       id: roomId,
       gameType,
       rules,
       maxPlayers: totalPlayers,
-      turnTimeoutSeconds: MULTIPLAYER_TURN_SECONDS,
-      isPrivate: true,
+      turnTimeoutSeconds,
+      isPrivate: !!customRoomId,
       deckType: '36',
-    };
-
-    const room = this.createRoom(settings);
-    // Mezbonni 1-o'yinchiga qo'shish
-    room.addPlayer(hostId, hostName, false, sender, avatarUrl);
-    return room;
+      options,
+    });
   }
 
   public removeRoom(roomId: string): void {

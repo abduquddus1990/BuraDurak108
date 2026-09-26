@@ -17,6 +17,17 @@ export interface SpecialCombination {
   playerId: string;
 }
 
+export type BotLevel = 'EASY' | 'MEDIUM' | 'HARD';
+
+// Mezbon tanlaydigan stol sozlamalari (choyxonalar orasida qoidalar farq qiladi)
+export interface RoomOptions {
+  eggRule?: boolean; // Bura: tuxum qoidasi (standart: yoqilgan)
+  loneQueenBonus?: boolean; // 108: yolg'iz dama 20/40 va dama bilan chiqishda minus (standart: yoqilgan)
+  botLevel?: BotLevel; // Botlar darajasi (standart: MEDIUM)
+}
+
+export const TURN_SECONDS_OPTIONS = [15, 30, 60] as const;
+
 export interface RoomSettings {
   id: string;
   gameType: GameType;
@@ -26,6 +37,7 @@ export interface RoomSettings {
   isPrivate: boolean;
   deckType: '36' | '52';
   targetScore?: number; // Burkozelda 12 jarima, 108 da 108 ochko
+  options?: RoomOptions;
 }
 
 export interface PlayerPublic {
@@ -113,4 +125,5 @@ export interface TableState {
   pendingPenaltyRank?: '6' | '7' | null; // 108: qaysi karta zanjiri ketyapti
   leadCardIds?: string[]; // Bura: javob berilishi kerak bo'lgan (oxirgi yurilgan/urilgan) kartalar
   lastTrick?: { winnerId: string; cards: PlayedTrickCard[] }; // Bura: oxirgi olingan vzyatka
+  rematchVotes?: string[]; // O'yin tugagach "Yana bir partiya" deganlar
 }

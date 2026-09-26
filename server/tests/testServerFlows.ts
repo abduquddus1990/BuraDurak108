@@ -92,6 +92,23 @@ function assert(cond: boolean, name: string) {
   const err = a.last('ACTION_ERROR');
   assert(!!err, `Soxta karta bilan harakat rad etildi: ${err?.message}`);
 
+  // 5.1 Tez o'yin: bir xil sozlamani tanlagan ikki o'yinchi bitta stolga tushadi
+  const q1 = client(), q2 = client();
+  await Promise.all([q1.opened, q2.opened]);
+  q1.send('REGISTER_USER', { displayName: 'Q1' });
+  q2.send('REGISTER_USER', { displayName: 'Q2' });
+  await wait(300);
+  q1.send('QUICK_MATCH_JOIN', { gameType: 'ONE_HUNDRED_EIGHT', rules: 'KOROL_QARGA', totalPlayers: 2 });
+  await wait(300);
+  assert(q1.last('QUICK_MATCH_STATUS')?.status?.waiting === 1, "Tez o'yin: navbatda 1 kishi");
+  q2.send('QUICK_MATCH_JOIN', { gameType: 'ONE_HUNDRED_EIGHT', rules: 'KOROL_QARGA', totalPlayers: 2 });
+  await wait(500);
+  const r1 = q1.last('ROOM_JOINED')?.roomId, r2 = q2.last('ROOM_JOINED')?.roomId;
+  assert(!!r1 && r1 === r2, "Tez o'yin: ikkalasi bitta stolga tushdi");
+  assert(q1.last('TABLE_UPDATE')?.tableState?.status === 'PLAYING', "Tez o'yin: o'yin boshlandi");
+  q1.ws.close();
+  q2.ws.close();
+
   // 6. Reyting jadvali so'rovi ishlaydi
   a.send('GET_LEADERBOARD', {});
   await wait(300);

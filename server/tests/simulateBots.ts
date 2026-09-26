@@ -4,7 +4,7 @@ import { BuraEngine } from '../src/engine/BuraEngine';
 import { DurakEngine } from '../src/engine/DurakEngine';
 import { OneHundredEightEngine } from '../src/engine/OneHundredEightEngine';
 import { BotAI } from '../src/ai/BotAI';
-import { GameRules, GameType } from '../../shared/src/types/game';
+import { BotLevel, GameRules, GameType } from '../../shared/src/types/game';
 
 const GAMES_PER_CONFIG = 60;
 const MAX_STEPS = 5000;
@@ -28,6 +28,9 @@ function runGame(gameType: GameType, rules: GameRules, n: number): string | null
     : gameType === 'DURAK' ? new DurakEngine('sim', settings)
     : new OneHundredEightEngine('sim', settings);
   for (let i = 0; i < n; i++) engine.addPlayer({ id: `b${i}`, username: `B${i}`, isBot: true });
+  // Har bir o'yinchi tasodifiy darajada o'ynaydi - uchala daraja ham qotib qolmasligini tekshiramiz
+  const levels: BotLevel[] = ['EASY', 'MEDIUM', 'HARD'];
+  const levelOf = new Map<string, BotLevel>(engine.players.map((p: any) => [p.id, levels[Math.floor(Math.random() * 3)]]));
   engine.initGame();
 
   for (let step = 0; step < MAX_STEPS; step++) {
@@ -39,7 +42,7 @@ function runGame(gameType: GameType, rules: GameRules, n: number): string | null
     const active = engine.players[engine.activePlayerIndex];
     let res: any;
     if (engine instanceof BuraEngine) {
-      const move = BotAI.makeBuraMove(engine, active.id);
+      const move = BotAI.makeBuraMove(engine, active.id, levelOf.get(active.id));
       if (move.action === 'DECLARE' && move.type) res = engine.declareCombination(active.id, move.type);
       else if (move.action === 'PLAY' && move.cards) res = engine.playCards(active.id, move.cards);
       else res = engine.foldOrPass(active.id, move.cards || []);
@@ -51,12 +54,12 @@ function runGame(gameType: GameType, rules: GameRules, n: number): string | null
         + engine.players.reduce((s: number, p: any) => s + p.hand.length + (p.wonCards?.length || 0), 0);
       if (engine.status === 'PLAYING' && total !== 36) return `Bura kartalar soni buzildi: ${total}`;
     } else if (engine instanceof OneHundredEightEngine) {
-      const move = BotAI.make108Move(engine, active.id);
+      const move = BotAI.make108Move(engine, active.id, levelOf.get(active.id));
       res = move.action === 'PLAY' && move.card ? engine.playCard(active.id, move.card, move.chosenSuit) : { success: false };
       if (!res.success) res = engine.drawCard(active.id);
       if (!res.success) res = engine.pass(active.id);
     } else {
-      const move = BotAI.makeDurakMove(engine, active.id);
+      const move = BotAI.makeDurakMove(engine, active.id, levelOf.get(active.id));
       if (move.action === 'ATTACK' && move.card) res = engine.attack(active.id, move.card);
       else if (move.action === 'DEFEND' && move.card && move.targetCardId) res = engine.defend(active.id, move.targetCardId, move.card);
       else if (move.action === 'TAKE') res = engine.takeCards(active.id);

@@ -1,4 +1,4 @@
-import { GameType, GameRules } from '../../../shared/src/types/game';
+import { GameType, GameRules, RoomOptions } from '../../../shared/src/types/game';
 
 export type MessageHandler = (data: any) => void;
 
@@ -97,7 +97,8 @@ export class GameClient {
     playerName: string,
     gameType: GameType,
     rules: GameRules,
-    totalPlayers: number
+    totalPlayers: number,
+    options?: RoomOptions
   ): void {
     this.send('CREATE_BOT_ROOM', {
       playerId,
@@ -105,6 +106,7 @@ export class GameClient {
       gameType,
       rules,
       totalPlayers,
+      options,
     });
   }
 
@@ -169,7 +171,8 @@ export class GameClient {
     gameType: GameType,
     rules: GameRules,
     totalPlayers: number,
-    roomId?: string
+    roomId?: string,
+    setup?: { options: RoomOptions; turnSeconds: number }
   ): void {
     this.send('CREATE_MULTIPLAYER_ROOM', {
       playerId,
@@ -178,7 +181,17 @@ export class GameClient {
       rules,
       totalPlayers,
       roomId,
+      options: setup ? { ...setup.options, turnSeconds: setup.turnSeconds } : undefined,
     });
+  }
+
+  // Tez o'yin navbati
+  public quickMatchJoin(gameType: GameType, rules: GameRules, totalPlayers: number): void {
+    this.send('QUICK_MATCH_JOIN', { gameType, rules, totalPlayers });
+  }
+
+  public quickMatchLeave(): void {
+    this.send('QUICK_MATCH_LEAVE', {});
   }
 
   public startRoomWithBots(roomId?: string): void {

@@ -680,7 +680,8 @@ export class BuraEngine extends BaseEngine {
     const maxScore = Math.max(...this.players.map(p => p.score));
     const leaders = this.players.filter(p => p.score === maxScore);
 
-    if (leaders.length >= 2) {
+    // Tuxum qoidasi stol sozlamasida o'chirilgan bo'lsa - teng ochkoda o'rindiq tartibida birinchisi yutadi
+    if (leaders.length >= 2 && this.settings.options?.eggRule !== false) {
       this.declareEgg(leaders.map(p => p.username));
       return;
     }

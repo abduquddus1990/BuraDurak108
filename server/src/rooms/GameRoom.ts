@@ -36,6 +36,8 @@ export class GameRoom {
   // O'yin tugaganda bir marta chaqiriladi (reyting va statistika uchun)
   public onGameOver?: (room: GameRoom) => void;
   private resultRecorded = false;
+  // O'yin tugagach "Yana bir partiya" deganlar
+  private rematchVotes = new Set<string>();
 
   constructor(id: string, settings: RoomSettings, chatManager: ChatManager) {
     this.id = id;
@@ -150,6 +152,7 @@ export class GameRoom {
       ...baseState,
       players: baseState.players.map(p => ({ ...p, isConnected: p.isBot || this.clients.has(p.id) })),
       turnRemainingMs: this.turnDeadline !== null ? Math.max(0, this.turnDeadline - Date.now()) : undefined,
+      rematchVotes: this.engine.status === 'GAME_OVER' ? Array.from(this.rematchVotes) : undefined,
     };
     for (const [playerId, sender] of this.clients.entries()) {
       const privateHand = this.engine.getPlayerHand(playerId);
@@ -180,6 +183,9 @@ export class GameRoom {
 
     if (action === 'READY_NEXT_ROUND') {
       return this.markReady(playerId);
+    }
+    if (action === 'REMATCH') {
+      return this.requestRematch(playerId);
     }
 
     if (this.engine instanceof BuraEngine) {
@@ -251,6 +257,24 @@ export class GameRoom {
       return { success: true, message: move.action === 'TAKE' ? '💡 Ura olmaysiz - kartalarni oling' : '💡 "Bita" deng' };
     }
     return { success: false, message: "Maslahat yo'q" };
+  }
+
+  // "Yana bir partiya": stolda ulangan barcha odamlar rozi bo'lgach, xuddi shu tarkib bilan yangi partiya boshlanadi
+  public requestRematch(playerId: string): { success: boolean; message: string } {
+    if (this.engine.status !== 'GAME_OVER') return { success: false, message: "Partiya hali tugamagan" };
+    if (!this.engine.players.some(p => p.id === playerId)) return { success: false, message: "Siz bu stolda o'ynamagansiz" };
+    this.rematchVotes.add(playerId);
+
+    const waitingFor = this.engine.players.filter(p => !p.isBot && this.clients.has(p.id) && !this.rematchVotes.has(p.id));
+    if (waitingFor.length === 0) {
+      this.rematchVotes.clear();
+      this.resultRecorded = false;
+      this.turnKey = '';
+      this.startGame();
+      return { success: true, message: 'Yangi partiya boshlandi!' };
+    }
+    this.broadcastState();
+    return { success: true, message: `Boshqalar kutilmoqda (${waitingFor.length})` };
   }
 
   private markReady(playerId: string): { success: boolean; message: string } {
@@ -366,9 +390,12 @@ export class GameRoom {
 
   private executeBotTurn(botId: string): void {
     let moveResult: ActionResult = { success: false, message: '' };
+    // Botlar stol sozlamasidagi darajada o'ynaydi; uzilgan/vaqti tugagan odam o'rniga esa standart darajada
+    const isRealBot = !!this.engine.players.find(p => p.id === botId)?.isBot;
+    const level = isRealBot ? this.settings.options?.botLevel || 'MEDIUM' : 'MEDIUM';
 
     if (this.engine instanceof BuraEngine) {
-      const move = BotAI.makeBuraMove(this.engine, botId);
+      const move = BotAI.makeBuraMove(this.engine, botId, level);
       if (move.action === 'DECLARE' && move.type) {
         moveResult = this.engine.declareCombination(botId, move.type);
       } else if (move.action === 'PLAY' && move.cards) {
@@ -381,7 +408,7 @@ export class GameRoom {
         moveResult = this.engine.foldOrPass(botId, []);
       }
     } else if (this.engine instanceof OneHundredEightEngine) {
-      const move = BotAI.make108Move(this.engine, botId);
+      const move = BotAI.make108Move(this.engine, botId, level);
       if (move.action === 'PLAY' && move.card) {
         moveResult = this.engine.playCard(botId, move.card, move.chosenSuit);
       }
@@ -389,7 +416,7 @@ export class GameRoom {
         moveResult = this.engine.drawCard(botId);
       }
     } else if (this.engine instanceof DurakEngine) {
-      const move = BotAI.makeDurakMove(this.engine, botId);
+      const move = BotAI.makeDurakMove(this.engine, botId, level);
       if (move.action === 'ATTACK' && move.card) {
         moveResult = this.engine.attack(botId, move.card);
       } else if (move.action === 'DEFEND' && move.card && move.targetCardId) {

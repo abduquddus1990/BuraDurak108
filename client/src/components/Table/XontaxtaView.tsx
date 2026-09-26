@@ -44,6 +44,7 @@ interface XontaxtaViewProps {
   hintCardIds?: string[];
   hintVersion?: number;
   onRequestHint?: () => void;
+  onRematch?: () => void;
 }
 
 export const XontaxtaView: React.FC<XontaxtaViewProps> = ({
@@ -69,6 +70,7 @@ export const XontaxtaView: React.FC<XontaxtaViewProps> = ({
   hintCardIds,
   hintVersion = 0,
   onRequestHint,
+  onRematch,
 }) => {
   const { sound, setPref } = useUiPrefs();
   const [isRulesOpen, setIsRulesOpen] = useState(false);
@@ -716,6 +718,9 @@ export const XontaxtaView: React.FC<XontaxtaViewProps> = ({
           gameType={tableState.settings.gameType}
           onReadyNext={onReadyNextRound}
           onLeaveRoom={onLeaveRoom}
+          onRematch={onRematch}
+          rematchVotes={tableState.rematchVotes}
+          humanCount={tableState.players.filter((p) => !p.isBot).length}
         />
       ) : (
         (tableState.status === 'ROUND_OVER' || tableState.status === 'GAME_OVER') && (
@@ -731,9 +736,21 @@ export const XontaxtaView: React.FC<XontaxtaViewProps> = ({
                   {tableState.players.find((p) => p.id === tableState.winnerId)?.username || 'Noma\'lum'}
                 </b>
               </p>
+              {tableState.status === 'GAME_OVER' && !tableState.winnerId && (
+                <p className="text-[11px] text-stone-400">Durang - o'yin juda cho'zilib ketdi.</p>
+              )}
+              {tableState.status === 'GAME_OVER' && onRematch && (
+                <button
+                  onClick={onRematch}
+                  disabled={(tableState.rematchVotes || []).includes(currentUserId)}
+                  className="mt-2 w-full py-3 rounded-2xl bg-gradient-to-r from-emerald-600 to-green-600 text-white font-black text-sm shadow hover:brightness-110 disabled:opacity-60"
+                >
+                  {(tableState.rematchVotes || []).includes(currentUserId) ? '🔁 Boshqalar kutilmoqda...' : '🔁 Yana bir partiya'}
+                </button>
+              )}
               <button
                 onClick={onLeaveRoom}
-                className="mt-3 w-full py-3 rounded-2xl bg-gradient-to-r from-amber-500 to-yellow-600 text-stone-950 font-black text-sm shadow hover:brightness-110"
+                className="mt-2 w-full py-3 rounded-2xl bg-gradient-to-r from-amber-500 to-yellow-600 text-stone-950 font-black text-sm shadow hover:brightness-110"
               >
                 Asosiy Menyuga Qaytish
               </button>
