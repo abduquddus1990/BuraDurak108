@@ -109,6 +109,21 @@ function assert(cond: boolean, name: string) {
   q1.ws.close();
   q2.ws.close();
 
+  // 5.2 Mahalla ochish va ro'yxat; mehmon Stars bilan xarid qila olmaydi
+  const clanTag = `T${Date.now() % 10000}`;
+  a.send('CLAN_CREATE', { name: `Test mahalla ${clanTag}`, tag: clanTag });
+  await wait(400);
+  assert(a.last('CLANS')?.myClan?.tag === clanTag && a.last('PROFILE_UPDATE')?.profile?.clan?.tag === clanTag, 'Mahalla ochildi va profilga yozildi');
+  a.send('CLAN_LEAVE', {});
+  await wait(300);
+  assert(a.last('CLANS')?.myClan === null, 'Mahalladan chiqildi');
+  a.send('BUY_ITEM', { itemId: 'vip_30' });
+  await wait(300);
+  assert(/Telegram/.test(a.last('ACTION_ERROR')?.message || ''), 'Mehmon Stars bilan xarid qila olmaydi (faqat Telegram)');
+  a.send('GET_LEADERBOARD', { gameType: 'DURAK' });
+  await wait(300);
+  assert(a.last('LEADERBOARD')?.gameType === 'DURAK', "O'yin turi bo'yicha reyting so'raldi");
+
   // 6. Reyting jadvali so'rovi ishlaydi
   a.send('GET_LEADERBOARD', {});
   await wait(300);

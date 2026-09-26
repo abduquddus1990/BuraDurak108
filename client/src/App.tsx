@@ -17,7 +17,11 @@ import { RulesModal } from './components/Modals/RulesModal';
 import { InviteFriendsModal } from './components/Modals/InviteFriendsModal';
 import { InvitationToast } from './components/Modals/InvitationToast';
 import { gameClient } from './services/gameClient';
-import { getTelegramUser, getTelegramInitData, initTelegramApp, triggerHaptic } from './services/telegramSdk';
+import { getTelegramUser, getTelegramInitData, initTelegramApp, triggerHaptic, openInvoice } from './services/telegramSdk';
+import { setShareBotUsername, shareText } from './services/share';
+import { ShopProvider } from './services/shop';
+import { ACHIEVEMENTS, AchievementId, isThemeUnlocked } from '../../shared/src/types/progress';
+import { ClanDetail, ClanItem } from '../../shared/src/types/social';
 import { detectSpecialCombinations, sortHand } from '../../shared/src/utils/deck';
 import { BuraEngine } from '../../server/src/engine/BuraEngine';
 import { OneHundredEightEngine } from '../../server/src/engine/OneHundredEightEngine';
@@ -169,6 +173,11 @@ export function App() {
   const [connectionStatus, setConnectionStatus] = useState<'connected' | 'reconnecting'>('connected');
   const [hint, setHint] = useState<{ cardIds: string[]; version: number }>({ cardIds: [], version: 0 });
   const [isRulesOpen, setIsRulesOpen] = useState(false);
+  const [leaderboardGame, setLeaderboardGame] = useState<GameType | null>(null);
+  const [clans, setClans] = useState<ClanItem[] | null>(null);
+  const [myClan, setMyClan] = useState<ClanDetail | null>(null);
+  // Yangi olingan yutuqlar (bildirishnoma + ulashish)
+  const [newAchievements, setNewAchievements] = useState<AchievementId[]>([]);
   // Tez o'yin: navbatda kutish holati (null - navbatda emas)
   const [quickMatch, setQuickMatch] = useState<{ waiting: number; needed: number; botFillInMs: number } | null>(null);
   // Do'stlar stoli uchun tanlangan sozlamalar
@@ -234,6 +243,7 @@ export function App() {
     const unsubscribe = gameClient.onMessage((data) => {
       if (data.type === 'SESSION') {
         const profile: UserProfile = data.profile;
+        setShareBotUsername(data.botUsername);
         setCurrentUser(profile);
         saveUser(profile);
         if (data.guestToken) {
@@ -262,6 +272,16 @@ export function App() {
         if (typeof data.ratingDelta === 'number' && data.ratingDelta !== 0) {
           const sign = data.ratingDelta > 0 ? '+' : '';
           setInfoNotice(`Reyting: ${sign}${data.ratingDelta} (ELO ${data.profile.ratingElo})`);
+        } else if (data.dailyJustCompleted) {
+          setInfoNotice('📅 Bugungi kunlik vazifalar bajarildi!');
+        }
+        if (data.purchasedItemId) {
+          setInfoNotice("💫 Xarid muvaffaqiyatli! Rahmat - dizayn ochildi.");
+          triggerHaptic('success');
+        }
+        if (Array.isArray(data.newAchievements) && data.newAchievements.length > 0) {
+          setNewAchievements(data.newAchievements);
+          triggerHaptic('success');
         }
       }
       if (data.type === 'QUICK_MATCH_STATUS') {
@@ -270,6 +290,17 @@ export function App() {
       if (data.type === 'HINT') {
         setInfoNotice(data.message);
         setHint((prev) => ({ cardIds: data.cardIds || [], version: prev.version + 1 }));
+      }
+      if (data.type === 'CLANS') {
+        setClans(data.clans || []);
+        setMyClan(data.myClan || null);
+      }
+      if (data.type === 'INVOICE') {
+        const opened = openInvoice(data.link, (status) => {
+          if (status === 'paid') setInfoNotice("💫 To'lov qabul qilindi, dizayn tez orada ochiladi...");
+          else if (status === 'failed') setActionError("To'lov amalga oshmadi");
+        });
+        if (!opened) window.open(data.link, '_blank');
       }
       if (data.type === 'LEADERBOARD') {
         setLeaderboard(data.players || []);
@@ -331,6 +362,12 @@ export function App() {
     const timer = setTimeout(() => setActionError(null), 2500);
     return () => clearTimeout(timer);
   }, [actionError]);
+
+  useEffect(() => {
+    if (newAchievements.length === 0) return;
+    const timer = setTimeout(() => setNewAchievements([]), 7000);
+    return () => clearTimeout(timer);
+  }, [newAchievements]);
 
   useEffect(() => {
     if (!infoNotice) return;
@@ -608,15 +645,30 @@ export function App() {
     setHint((prev) => ({ cardIds, version: prev.version + 1 }));
   };
 
-  const handleOpenLeaderboard = () => {
+  const handleOpenLeaderboard = (gameType: GameType | null = leaderboardGame) => {
     setIsLeaderboardOpen(true);
+    setLeaderboardGame(gameType);
     if (gameClient.isConnected()) {
       setLeaderboard(null);
-      gameClient.getLeaderboard();
+      gameClient.send('GET_LEADERBOARD', { gameType });
     } else {
       setLeaderboard([]);
     }
   };
+
+  // Telegram Stars orqali xarid (server hisob-faktura havolasini qaytaradi)
+  const handleBuyItem = (itemId: string) => {
+    if (!gameClient.isConnected()) {
+      setActionError("Xarid uchun serverga ulanish kerak");
+      return;
+    }
+    gameClient.send('BUY_ITEM', { itemId });
+  };
+
+  // Premium dizayn: sotib olingan yoki VIP bo'lsa ochiq (VIP tugasa - standart dizaynga qaytadi)
+  const isUnlocked = (themeId: string) => isThemeUnlocked(themeId, currentUser.ownedItems, currentUser.vipUntil);
+  const effectiveThemeId = isUnlocked(currentThemeId) ? currentThemeId : 'classic_wood';
+  const effectiveCardBackId = isUnlocked(currentCardBackId) ? currentCardBackId : 'paxtagul_gold';
 
   // Tez o'yin: server o'xshash reytingli raqiblarni topadi (30 soniyada topilmasa botlar qo'shiladi)
   const handleQuickMatch = (gameType: GameType, rules: GameRules, totalPlayers: number) => {
@@ -710,6 +762,7 @@ export function App() {
   const bgTheme = APP_BACKGROUNDS[currentBgId] || APP_BACKGROUNDS.choyxona_night;
 
   return (
+    <ShopProvider value={{ isUnlocked, buyItem: handleBuyItem }}>
     <div className={`w-screen h-screen flex flex-col text-white overflow-hidden select-none ${bgTheme.backgroundClass}`}>
       {actionError && (
         <div className="fixed bottom-24 left-1/2 -translate-x-1/2 z-[110] max-w-[90%] px-4 py-2 rounded-2xl bg-rose-950/95 border border-rose-500 text-rose-100 text-xs font-bold shadow-2xl text-center">
@@ -746,6 +799,30 @@ export function App() {
         </div>
       )}
 
+      {newAchievements.length > 0 && (
+        <div className="fixed top-24 left-1/2 -translate-x-1/2 z-[110] w-[92%] max-w-sm bg-stone-900/95 border-2 border-yellow-500 rounded-2xl p-3 shadow-2xl anim-pop">
+          <div className="text-[11px] font-black text-yellow-300 uppercase tracking-wide">🏆 Yangi nishon!</div>
+          {newAchievements.map((id) => (
+            <div key={id} className="flex items-center gap-2 mt-1">
+              <span className="text-xl">{ACHIEVEMENTS[id].icon}</span>
+              <div className="flex flex-col">
+                <span className="text-xs font-bold text-amber-100">{ACHIEVEMENTS[id].title}</span>
+                <span className="text-[10px] text-stone-400">{ACHIEVEMENTS[id].description}</span>
+              </div>
+            </div>
+          ))}
+          <button
+            onClick={() => {
+              const first = ACHIEVEMENTS[newAchievements[0]];
+              shareText(`${first.icon} Choyxona'da "${first.title}" nishonini oldim!`);
+            }}
+            className="mt-2 w-full py-1.5 rounded-xl bg-sky-700 text-white text-xs font-bold"
+          >
+            📤 Do'stlarga ulashish
+          </button>
+        </div>
+      )}
+
       {infoNotice && (
         <div className="fixed top-16 left-1/2 -translate-x-1/2 z-[110] max-w-[90%] px-4 py-2 rounded-2xl bg-emerald-950/95 border border-emerald-500 text-emerald-100 text-xs font-bold shadow-2xl text-center">
           {infoNotice}
@@ -776,7 +853,7 @@ export function App() {
           onOpenFriends={() => setIsFriendsOpen(true)}
           onOpenClans={() => setIsClansOpen(true)}
           onOpenSettings={() => setIsSettingsOpen(true)}
-          onOpenLeaderboard={handleOpenLeaderboard}
+          onOpenLeaderboard={() => handleOpenLeaderboard()}
           onOpenRules={() => setIsRulesOpen(true)}
           onQuickMatch={handleQuickMatch}
           onOpenTheme={() => setIsThemeOpen(true)}
@@ -792,9 +869,9 @@ export function App() {
             hand={hand}
             currentUserId={currentUser.id}
             chatMessages={chatMessages}
-            currentThemeId={currentThemeId}
+            currentThemeId={effectiveThemeId}
             currentBgId={currentBgId}
-            currentCardBackId={currentCardBackId}
+            currentCardBackId={effectiveCardBackId}
             onPlayAction={handlePlayAction}
             onSendChatMessage={handleSendChatMessage}
             onLeaveRoom={handleLeaveRoom}
@@ -902,6 +979,10 @@ export function App() {
         profile={currentUser}
         isOpen={isProfileOpen}
         onClose={() => setIsProfileOpen(false)}
+        onOpenShop={() => {
+          setIsProfileOpen(false);
+          setIsSettingsOpen(true);
+        }}
       />
       <FriendsDrawer
         friends={friends}
@@ -912,6 +993,18 @@ export function App() {
       <ClansDrawer
         isOpen={isClansOpen}
         onClose={() => setIsClansOpen(false)}
+        clans={gameClient.isConnected() ? clans : []}
+        myClan={myClan}
+        isOnline={gameClient.isConnected()}
+        onRefresh={() => {
+          if (gameClient.isConnected()) {
+            setClans(null);
+            gameClient.send('CLAN_LIST', {});
+          }
+        }}
+        onCreate={(name, tag) => gameClient.send('CLAN_CREATE', { name, tag })}
+        onJoin={(clanId) => gameClient.send('CLAN_JOIN', { clanId })}
+        onLeave={() => gameClient.send('CLAN_LEAVE', {})}
       />
       <SettingsModal
         profile={currentUser}
@@ -921,17 +1014,20 @@ export function App() {
           setAuthPromptMessage(undefined);
           setIsAuthOpen(true);
         }}
+        onBuyItem={handleBuyItem}
       />
       <LeaderboardModal
         isOpen={isLeaderboardOpen}
         onClose={() => setIsLeaderboardOpen(false)}
         players={leaderboard}
         currentUserId={currentUser.id}
+        gameType={leaderboardGame}
+        onChangeGameType={handleOpenLeaderboard}
       />
       <ThemeSelectorModal
-        currentThemeId={currentThemeId}
+        currentThemeId={effectiveThemeId}
         currentBgId={currentBgId}
-        currentCardBackId={currentCardBackId}
+        currentCardBackId={effectiveCardBackId}
         isOpen={isThemeOpen}
         onClose={() => setIsThemeOpen(false)}
         onSelectTheme={handleSelectTheme}
@@ -950,5 +1046,6 @@ export function App() {
         promptMessage={authPromptMessage}
       />
     </div>
+    </ShopProvider>
   );
 }

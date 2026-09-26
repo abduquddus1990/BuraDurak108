@@ -53,6 +53,7 @@ export interface PlayerPublic {
   ready: boolean;
   isEliminated?: boolean; // 108 da 108 dan oshib chiqib ketgan o'yinchilar
   isConnected?: boolean; // Odam stolga ulanganmi (uzilgan bo'lsa uning o'rniga server yuradi)
+  badge?: string; // Masalan VIP uchun "👑"
 }
 
 export interface PlayerPrivate extends PlayerPublic {

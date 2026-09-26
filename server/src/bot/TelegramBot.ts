@@ -9,7 +9,19 @@ export interface TelegramBotInfo {
 const escapeHtml = (text: string): string =>
   String(text).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 
+import { ShopItem, findShopItem } from '../../../shared/src/types/progress';
+
+export interface PaymentEvent {
+  userId: string; // ilova ichidagi foydalanuvchi ID si (hisob-faktura payload'idan)
+  itemId: string;
+  chargeId: string;
+  telegramUserId: number;
+}
+
 export class TelegramBot {
+  // Muvaffaqiyatli Stars to'lovi (server mahsulotni beradi)
+  public onPayment?: (event: PaymentEvent) => void;
+
   private token: string;
   private miniAppUrl: string;
   private isRunning: boolean = false;
@@ -121,14 +133,18 @@ export class TelegramBot {
       const res = await this.callApi('getUpdates', {
         offset: this.offset,
         timeout: 20,
-        allowed_updates: ['message', 'callback_query'],
+        allowed_updates: ['message', 'callback_query', 'pre_checkout_query'],
       });
 
       if (res.ok && Array.isArray(res.result)) {
         for (const update of res.result) {
           this.offset = update.update_id + 1;
           try {
-            if (update.message) {
+            if (update.pre_checkout_query) {
+              await this.handlePreCheckout(update.pre_checkout_query);
+            } else if (update.message?.successful_payment) {
+              this.handleSuccessfulPayment(update.message);
+            } else if (update.message) {
               await this.handleMessage(update.message);
             } else if (update.callback_query) {
               await this.handleCallbackQuery(update.callback_query);
@@ -375,6 +391,54 @@ Tuz (11 ochko) > 10 (10 ochko) > Korol (4 ochko) > Dama (3 ochko) > Valet (2 och
       return !!res?.ok;
     } catch (e) {
       return false;
+    }
+  }
+
+  // --- Telegram Stars do'koni ---
+
+  // Mini App ichida tg.openInvoice(link) orqali ochiladigan hisob-faktura havolasi
+  public async createInvoiceLink(item: ShopItem, userId: string): Promise<string | null> {
+    if (!this.isRunning || !this.token) return null;
+    try {
+      const res = await this.callApi('createInvoiceLink', {
+        title: item.title,
+        description: item.description,
+        payload: JSON.stringify({ itemId: item.id, userId }),
+        currency: 'XTR', // Telegram Stars
+        prices: [{ label: item.title, amount: item.priceStars }],
+      });
+      return res?.ok ? res.result : null;
+    } catch (e) {
+      return null;
+    }
+  }
+
+  // To'lovdan oldin: mahsulot va narx hali ham to'g'riligini tasdiqlash (10 soniya ichida javob berish shart)
+  private async handlePreCheckout(query: any): Promise<void> {
+    let ok = false;
+    try {
+      const payload = JSON.parse(query.invoice_payload || '{}');
+      const item = findShopItem(payload.itemId);
+      ok = !!item && query.currency === 'XTR' && query.total_amount === item.priceStars && typeof payload.userId === 'string';
+    } catch (e) {}
+    await this.callApi('answerPreCheckoutQuery', ok
+      ? { pre_checkout_query_id: query.id, ok: true }
+      : { pre_checkout_query_id: query.id, ok: false, error_message: "Mahsulot topilmadi yoki narx o'zgargan. Qaytadan urinib ko'ring." });
+  }
+
+  private handleSuccessfulPayment(msg: any): void {
+    const payment = msg.successful_payment;
+    try {
+      const payload = JSON.parse(payment.invoice_payload || '{}');
+      if (!findShopItem(payload.itemId) || typeof payload.userId !== 'string') return;
+      this.onPayment?.({
+        userId: payload.userId,
+        itemId: payload.itemId,
+        chargeId: payment.telegram_payment_charge_id,
+        telegramUserId: msg.from?.id,
+      });
+    } catch (e: any) {
+      console.error("❌ [Telegram Bot] To'lovni qayta ishlashda xato:", e.message);
     }
   }
 

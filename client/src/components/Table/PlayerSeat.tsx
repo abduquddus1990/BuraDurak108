@@ -91,6 +91,7 @@ export const PlayerSeat: React.FC<PlayerSeatProps> = ({
             <span className={`${compact ? 'text-[11px] max-w-[70px]' : 'text-xs max-w-[90px]'} font-semibold text-amber-100 truncate`}>
               {player.username}
             </span>
+            {player.badge && <span className="text-[10px] leading-none" title="VIP">{player.badge}</span>}
             {isCurrentPlayer && <span className="text-[9px] text-amber-400 font-bold">(Siz)</span>}
           </div>
           {disconnected ? (

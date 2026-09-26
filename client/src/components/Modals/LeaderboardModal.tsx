@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Trophy, Medal, Crown, X } from 'lucide-react';
+import { GameType } from '../../../../shared/src/types/game';
 
 export interface LeaderboardEntry {
   id: string;
@@ -15,9 +16,12 @@ interface LeaderboardModalProps {
   // null - hali yuklanmoqda (yoki server bilan aloqa yo'q)
   players: LeaderboardEntry[] | null;
   currentUserId?: string;
+  // null - umumiy reyting
+  gameType?: GameType | null;
+  onChangeGameType?: (gameType: GameType | null) => void;
 }
 
-export const LeaderboardModal: React.FC<LeaderboardModalProps> = ({ isOpen, onClose, players, currentUserId }) => {
+export const LeaderboardModal: React.FC<LeaderboardModalProps> = ({ isOpen, onClose, players, currentUserId, gameType = null, onChangeGameType }) => {
   const [activeTab, setActiveTab] = useState<'1-10' | '11-20' | '21-30'>('1-10');
 
   if (!isOpen) return null;
@@ -51,6 +55,26 @@ export const LeaderboardModal: React.FC<LeaderboardModalProps> = ({ isOpen, onCl
             Eng Kuchli 30 Talik Reytingi
           </h2>
         </div>
+
+        {/* O'yin turi bo'yicha reyting */}
+        {onChangeGameType && (
+          <div className="grid grid-cols-4 gap-1 text-[11px] font-bold">
+            {([
+              [null, 'Umumiy'],
+              ['BURA', '☕ Bura'],
+              ['DURAK', '🛡️ Durak'],
+              ['ONE_HUNDRED_EIGHT', '🎯 108'],
+            ] as [GameType | null, string][]).map(([g, label]) => (
+              <button
+                key={label}
+                onClick={() => onChangeGameType(g)}
+                className={`py-1.5 rounded-xl border transition ${gameType === g ? 'border-sky-400 bg-sky-900/60 text-sky-100' : 'border-stone-700 text-stone-400 hover:text-white'}`}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+        )}
 
         {/* 3 ta 10 talikni ko'rsatuvchi tablar */}
         <div className="grid grid-cols-3 gap-1 bg-stone-800/90 p-1 rounded-2xl border border-stone-700">

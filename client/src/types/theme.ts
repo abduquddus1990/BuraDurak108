@@ -4,7 +4,8 @@ export type TableThemeId =
   | 'sapphire_blue'
   | 'crimson_velvet'
   | 'midnight_cyber'
-  | 'ivory_silk';
+  | 'ivory_silk'
+  | 'samarqand_oltin'; // premium (Telegram Stars / VIP)
 
 export type AppBackgroundId =
   | 'choyxona_night'
@@ -19,7 +20,8 @@ export type CardBackId =
   | 'adras_blue'
   | 'registon_night'
   | 'ruby_classic'
-  | 'black_royal';
+  | 'black_royal'
+  | 'shoh_oltin'; // premium (Telegram Stars / VIP)
 
 export interface TableTheme {
   id: TableThemeId;
@@ -155,6 +157,17 @@ export const TABLE_THEMES: Record<TableThemeId, TableTheme> = {
     textColor: '#451a03',
     previewColor: '#fef08a',
   },
+  samarqand_oltin: {
+    id: 'samarqand_oltin',
+    name: 'Samarqand Oltin ✨',
+    type: 'dark',
+    tableBackground: 'radial-gradient(circle at center, #0f766e 0%, #134e4a 45%, #042f2e 100%)',
+    tableBorder: '#fcd34d',
+    feltColor: '#115e59',
+    accentGlow: 'rgba(252, 211, 77, 0.55)',
+    textColor: '#fef9c3',
+    previewColor: '#0f766e',
+  },
 };
 
 export const CARD_BACK_THEMES: Record<CardBackId, CardBackTheme> = {
@@ -197,5 +210,13 @@ export const CARD_BACK_THEMES: Record<CardBackId, CardBackTheme> = {
     borderColor: '#fbbf24',
     symbol: '⚔️',
     previewColor: '#1c1917',
+  },
+  shoh_oltin: {
+    id: 'shoh_oltin',
+    name: 'Shoh Oltin ✨',
+    backgroundClass: 'bg-gradient-to-br from-yellow-300 via-amber-500 to-yellow-800',
+    borderColor: '#fef08a',
+    symbol: '🌟',
+    previewColor: '#f59e0b',
   },
 };

@@ -10,7 +10,18 @@ export abstract class BaseEngine {
   public trumpCard?: Card;
   public isLastTrumpRevealed: boolean = false;
   public revealedTrumpCard?: Card;
-  public specialCombinationAlert?: SpecialCombinationAlert | null = null;
+  // Partiya davomidagi muhim hodisalar (yutuqlar uchun): Moskva, Bura, Molodka, Qarg'a damasi bilan chiqish...
+  public gameEvents: { type: string; playerId: string }[] = [];
+  private currentAlert: SpecialCombinationAlert | null = null;
+
+  // Kombinatsiya e'lon qilinganda hodisa avtomatik yoziladi
+  public get specialCombinationAlert(): SpecialCombinationAlert | null {
+    return this.currentAlert;
+  }
+  public set specialCombinationAlert(alert: SpecialCombinationAlert | null | undefined) {
+    this.currentAlert = alert || null;
+    if (alert) this.gameEvents.push({ type: alert.type, playerId: alert.playerId });
+  }
   public players: PlayerPrivate[] = [];
   public tableCards: PlayedTrickCard[] = [];
   public activePlayerIndex: number = 0;
@@ -56,6 +67,7 @@ export abstract class BaseEngine {
     }
     this.winnerId = undefined;
     this.specialCombinationAlert = null;
+    this.gameEvents = [];
     this.isLastTrumpRevealed = false;
     this.revealedTrumpCard = undefined;
     this.activeSuit = undefined;
@@ -128,6 +140,7 @@ export abstract class BaseEngine {
         avatarUrl: p.avatarUrl,
         isBot: p.isBot,
         cardsCount: p.hand.length,
+        badge: p.badge,
         score: p.score,
         penaltyPoints: p.penaltyPoints,
         isTurn: p.isTurn,

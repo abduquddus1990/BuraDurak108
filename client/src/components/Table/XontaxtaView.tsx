@@ -16,6 +16,7 @@ import { requestFullscreenAndLandscape, exitLandscape, triggerHaptic } from '../
 import { canBeatCard } from '../../../../shared/src/utils/deck';
 import { getPlayableHint } from '../../../../shared/src/utils/playable';
 import { playSound, announce } from '../../services/sound';
+import { shareText, gameResultText } from '../../services/share';
 import { useUiPrefs } from '../../services/uiPrefs';
 import { RulesModal } from '../Modals/RulesModal';
 import { ArrowLeft, MessageSquare, Palette, RotateCcw, BookOpen, Volume2, VolumeX, Eye } from 'lucide-react';
@@ -215,6 +216,20 @@ export const XontaxtaView: React.FC<XontaxtaViewProps> = ({
       triggerHaptic('light');
     }
   }, [tableState]);
+
+  // Partiya natijasini ulashish: har bir o'yinning g'olib qoidasi bo'yicha
+  const didIWin = (): boolean => {
+    const gameType = tableState.settings.gameType;
+    if (gameType === 'BURA') {
+      const results = tableState.roundSummary?.results || [];
+      const mine = results.find((r) => r.playerId === currentUserId);
+      if (!mine) return false;
+      return mine.totalPenalty < 12 && mine.totalPenalty === Math.min(...results.map((r) => r.totalPenalty));
+    }
+    if (gameType === 'DURAK') return !!tableState.winnerId && hand.length === 0;
+    return tableState.winnerId === currentUserId;
+  };
+  const handleShareResult = () => shareText(gameResultText(tableState.settings.gameType, didIWin()));
 
   // --- O'rindiqlar: raqiblar men o'tirgan joydan soat mili bo'yicha stol atrofiga joylashadi ---
   const myIndex = tableState.players.findIndex((p) => p.id === currentUserId);
@@ -720,6 +735,7 @@ export const XontaxtaView: React.FC<XontaxtaViewProps> = ({
           onLeaveRoom={onLeaveRoom}
           onRematch={onRematch}
           rematchVotes={tableState.rematchVotes}
+          onShare={handleShareResult}
           humanCount={tableState.players.filter((p) => !p.isBot).length}
         />
       ) : (
@@ -738,6 +754,14 @@ export const XontaxtaView: React.FC<XontaxtaViewProps> = ({
               </p>
               {tableState.status === 'GAME_OVER' && !tableState.winnerId && (
                 <p className="text-[11px] text-stone-400">Durang - o'yin juda cho'zilib ketdi.</p>
+              )}
+              {tableState.status === 'GAME_OVER' && (
+                <button
+                  onClick={handleShareResult}
+                  className="mt-2 w-full py-2.5 rounded-2xl bg-sky-700 hover:bg-sky-600 text-white font-bold text-xs"
+                >
+                  📤 Natijani ulashish
+                </button>
               )}
               {tableState.status === 'GAME_OVER' && onRematch && (
                 <button

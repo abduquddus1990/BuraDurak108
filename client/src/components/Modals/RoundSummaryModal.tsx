@@ -13,6 +13,7 @@ interface RoundSummaryModalProps {
   onRematch?: () => void;
   rematchVotes?: string[];
   humanCount?: number;
+  onShare?: () => void;
 }
 
 export const RoundSummaryModal: React.FC<RoundSummaryModalProps> = ({
@@ -24,6 +25,7 @@ export const RoundSummaryModal: React.FC<RoundSummaryModalProps> = ({
   onRematch,
   rematchVotes = [],
   humanCount = 1,
+  onShare,
 }) => {
   if (!roundSummary) return null;
 
@@ -171,6 +173,14 @@ export const RoundSummaryModal: React.FC<RoundSummaryModalProps> = ({
             </button>
           ) : (
             <>
+              {onShare && (
+                <button
+                  onClick={onShare}
+                  className="w-full py-2.5 rounded-2xl bg-sky-700 hover:bg-sky-600 text-white font-bold text-xs shadow"
+                >
+                  📤 Natijani do'stlarga ulashish
+                </button>
+              )}
               {onRematch && (
                 <button
                   onClick={onRematch}

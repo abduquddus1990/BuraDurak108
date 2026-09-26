@@ -3,12 +3,14 @@ import { UserProfile } from '../../../../shared/src/types/social';
 import { Settings, User, CreditCard, Sparkles, MessageCircle, ExternalLink, Crown, X, Star } from 'lucide-react';
 import { triggerHaptic } from '../../services/telegramSdk';
 import { useUiPrefs } from '../../services/uiPrefs';
+import { SHOP_ITEMS } from '../../../../shared/src/types/progress';
 
 interface SettingsModalProps {
   profile: UserProfile;
   isOpen: boolean;
   onClose: () => void;
   onOpenAuth: () => void;
+  onBuyItem?: (itemId: string) => void;
 }
 
 export const SettingsModal: React.FC<SettingsModalProps> = ({
@@ -16,7 +18,9 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   isOpen,
   onClose,
   onOpenAuth,
+  onBuyItem,
 }) => {
+  const isVip = !!profile.vipUntil && profile.vipUntil > Date.now();
   const { largeCards, sound, setPref } = useUiPrefs();
   if (!isOpen) return null;
 
@@ -86,35 +90,42 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
           </label>
         </div>
 
-        {/* 2. Pro Versiya, Donat va Maxsus Username Sotib Olish (10 000 so'm / 50 Stars) */}
+        {/* 2. Do'kon: VIP va premium dizaynlar (Telegram Stars) */}
         <div className="bg-gradient-to-br from-amber-950/80 via-stone-900 to-stone-900 border-2 border-yellow-500/80 p-4 rounded-2xl flex flex-col gap-2.5 shadow-xl">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-1.5 font-black text-sm text-yellow-300">
               <Crown className="w-4 h-4 text-yellow-400" />
-              <span>PRO Versiya & Donat</span>
+              <span>VIP va Premium Dizaynlar</span>
             </div>
-            <span className="bg-yellow-500 text-stone-950 font-black text-[10px] px-2 py-0.5 rounded-full">
-              10 000 SO'M (~50 Stars)
-            </span>
+            {isVip && (
+              <span className="bg-yellow-500 text-stone-950 font-black text-[10px] px-2 py-0.5 rounded-full">
+                VIP: {new Date(profile.vipUntil!).toLocaleDateString()} gacha
+              </span>
+            )}
           </div>
-
-          <p className="text-xs text-stone-300 leading-relaxed">
-            PRO statusi orqali reklamalarni o'chiring, oltin xontaxta skinini oling va o'yin ichida 
-            <b> Noyob Username (Taxallus)</b> oching!
-          </p>
-
-          <div className="flex gap-2 mt-1">
-            <button
-              onClick={() => handleOpenBot('StarsUchun_bot')}
-              className="flex-1 py-2 rounded-xl bg-gradient-to-r from-amber-500 to-yellow-600 text-stone-950 font-bold text-xs shadow hover:brightness-110 flex items-center justify-center gap-1.5"
-            >
-              <Star className="w-3.5 h-3.5 fill-current" />
-              <span>@StarsUchun_bot dan Olish</span>
-            </button>
-          </div>
-
+          {SHOP_ITEMS.map((item) => {
+            const owned = item.kind !== 'VIP' && (profile.ownedItems || []).includes(item.id);
+            return (
+              <div key={item.id} className="flex items-center justify-between gap-2 bg-stone-900/70 border border-stone-700 rounded-xl p-2.5">
+                <div className="flex flex-col text-left min-w-0">
+                  <span className="text-xs font-bold text-amber-100">{item.title}</span>
+                  <span className="text-[10px] text-stone-400 leading-snug">{item.description}</span>
+                </div>
+                {owned ? (
+                  <span className="text-[11px] font-bold text-emerald-300 shrink-0">✓ Sizda bor</span>
+                ) : (
+                  <button
+                    onClick={() => onBuyItem?.(item.id)}
+                    className="shrink-0 px-3 py-1.5 rounded-xl bg-gradient-to-r from-amber-500 to-yellow-600 text-stone-950 font-black text-xs shadow hover:brightness-110 flex items-center gap-1"
+                  >
+                    <Star className="w-3.5 h-3.5 fill-current" /> {item.priceStars}
+                  </button>
+                )}
+              </div>
+            );
+          })}
           <span className="text-[10px] text-stone-400 italic text-center">
-            Kelajakda: GetGems orqali NFT username ko'rinishida sotish imkoniyati qo'shiladi.
+            To'lov Telegram Stars orqali, faqat Telegram ichida. Pul tikish yo'q - faqat bezaklar.
           </span>
         </div>
 

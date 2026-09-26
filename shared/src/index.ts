@@ -4,3 +4,4 @@ export * from './types/chat';
 export * from './types/social';
 export * from './utils/deck';
 export * from './utils/playable';
+export * from './types/progress';

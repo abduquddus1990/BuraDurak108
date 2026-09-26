@@ -45,10 +45,27 @@ Loyiha qonuniy, pul tikilmaydigan sof musobaqa va do‘stona o‘yin (Competitiv
 
 ## ⚡ Qulayliklar va Xususiyatlar
 
-* **🤖 Aqlli Botlar (AI):** Yolg‘iz o‘ynash va mashq qilish uchun hisob-kitob qiluvchi botlar.
-* **💬 Choyxona Chati:** O‘yin vaqtida stol a'zolari bilan tezkor milliy iboralar (*"Choydan quy, jigar!"*, *"Boring bilan yur!"*, *"Kozel bo‘lding-ku!"*) va spamdan himoya qiluvchi taymer (Rate limiter).
-* **👥 Do‘stlar Davrasi:** Telegram orqali bitta havola bilan do‘stni aynan o‘z stolingizga taklif qilish (`t.me/share/url`).
-* **🛡️ Klanlar va Mahallalar:** Kelajakdagi respublika miqyosidagi mahalla musobaqalari uchun ELO reyting tizimi.
+**O'yin stoli**
+* Yurish mumkin bo'lgan kartalar ajratib ko'rsatiladi (108 va Durakda mos kelmaydiganlari xira, Burada urishga yaroqlilari yashil).
+* Raqiblar stol atrofida (chap / tepa / o'ng), Telegram avatari, navbat taymeri halqasi, tarqatuvchi 🃏 va VIP 👑 belgilari.
+* Animatsiyalar (tarqatish, stolga tushish, vzyatka yig'ilishi), ovoz effektlari va "Moskva!", "Bura!", "Tuxum!" e'lonlari.
+* Katta kartalar rejimi, ovozni o'chirish, oxirgi vzyatkani ko'rish, Durakda urish nishonini tanlash.
+* Aloqa uzilsa banner chiqadi; uzilgan o'yinchi o'rniga bot o'ynaydi, qayta ulanganda o'z joyiga qaytadi.
+* Ilova ichida qoidalar va bot o'yinlarida 💡 maslahat.
+
+**O'yin rejimlari**
+* ⚡ **Tez o'yin:** o'xshash reytingli raqib qidiriladi, 30 soniyada topilmasa bo'sh o'rinlarga bot qo'shiladi.
+* 🔁 **Yana bir partiya:** o'yin oxirida hamma rozi bo'lsa, xuddi shu tarkib bilan.
+* ⚙️ **Stol sozlamalari:** yurish vaqti (15/30/60 s), tuxum qoidasi, yolg'iz dama qoidasi, bot darajasi (yengil / o'rtacha / usta).
+
+**Ijtimoiy**
+* 📈 Har bir o'yin (Bura, Durak, 108) uchun alohida ELO reyting va reyting jadvali.
+* 🏆 13 ta nishon (Moskva, Qarg'a damasi, 5 ta ketma-ket g'alaba...) va 📅 kunlik vazifalar (ketma-ketlik bilan).
+* 📜 Oxirgi 20 ta partiya tarixi.
+* 🏘️ **Mahallalar ligasi:** mahalla ochish/qo'shilish, haftalik jadval (odamga qarshi g'alaba +3, botga qarshi +1).
+* 📤 Natija va nishonlarni Telegram orqali ulashish.
+* ⭐ **Telegram Stars do'koni:** VIP (30 kun) va premium dizaynlar. Narxlar: `shared/src/types/progress.ts` → `SHOP_ITEMS`.
+* 💬 Choyxona chati va do'stlarni stolga taklif qilish.
 
 ---
 

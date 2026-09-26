@@ -362,6 +362,7 @@ export class OneHundredEightEngine extends BaseEngine {
       let roundPenalty = 0;
       if (player.id === roundWinnerId) {
         if (loneQueenBonus && lastCard?.rank === 'Q') roundPenalty = -OneHundredEightEngine.loneQueenValue(lastCard);
+        if (lastCard?.rank === 'Q' && lastCard.suit === 'SPADES') this.gameEvents.push({ type: 'QUEEN_SPADES_EXIT', playerId: player.id });
       } else if (!player.isEliminated) {
         roundPenalty = OneHundredEightEngine.handPenalty(player.hand, loneQueenBonus);
       }
@@ -371,6 +372,7 @@ export class OneHundredEightEngine extends BaseEngine {
       // Kamikadze: Aynan 108 bo'lsa 0 ga tushadi
       if (player.penaltyPoints === 108) {
         player.penaltyPoints = 0;
+        this.gameEvents.push({ type: 'KAMIKADZE', playerId: player.id });
       } else if (player.penaltyPoints > 108) {
         // 108 dan oshgan o'yinchi chiqib ketadi!
         player.isEliminated = true;

@@ -11,7 +11,10 @@ import { Matchmaker, QueueEntry } from './rooms/Matchmaker';
 import { loadEnv } from './utils/env';
 import { TelegramBot } from './bot/TelegramBot';
 import { verifyTelegramInitData } from './auth/telegramAuth';
-import { UserStore, StoredUser } from './store/UserStore';
+import { UserStore, StoredUser, DEFAULT_ELO } from './store/UserStore';
+import { getDailyView } from './store/progression';
+import { recordRoomResult } from './store/gameResults';
+import { findShopItem } from '../../shared/src/types/progress';
 import { OnlineUserInfo, TableInvitation, UserProfile } from '../../shared/src/types/social';
 import { GameType, GameRules, RoomOptions, BotLevel, TURN_SECONDS_OPTIONS } from '../../shared/src/types/game';
 
@@ -45,8 +48,12 @@ app.get('/api/bot/status', (req, res) => {
   res.json(telegramBot.getStatus());
 });
 
+const GAME_TYPES: GameType[] = ['BURA', 'DURAK', 'ONE_HUNDRED_EIGHT'];
+const parseGameType = (raw: any): GameType | undefined => (GAME_TYPES.includes(raw) ? raw : undefined);
+const leaderboardFor = (gameType?: GameType) => userStore.leaderboard(30, gameType).map(u => toLeaderboardEntry(u, gameType));
+
 app.get('/api/leaderboard', (req, res) => {
-  res.json({ players: userStore.leaderboard(30).map(toLeaderboardEntry) });
+  res.json({ players: leaderboardFor(parseGameType(req.query.gameType)) });
 });
 
 // Bot tokenini almashtirish faqat ADMIN_TOKEN bilan ruxsat etiladi (aks holda istalgan odam botni egallab olishi mumkin edi)
@@ -70,25 +77,57 @@ app.post('/api/bot/configure', async (req, res) => {
 
 // --- Profil yordamchilari ---
 
-const toProfile = (u: StoredUser): UserProfile => ({
+const toProfile = (u: StoredUser): UserProfile => {
+  const clan = u.clanId ? userStore.getClan(u.clanId) : undefined;
+  return {
+    id: u.id,
+    telegramId: u.telegramId,
+    username: u.username,
+    displayName: u.displayName,
+    avatarUrl: u.avatarUrl,
+    ratingElo: u.ratingElo,
+    gamesPlayed: u.gamesPlayed,
+    gamesWon: u.gamesWon,
+    vipStatus: userStore.isVip(u.id),
+    vipUntil: u.vipUntil,
+    ratings: u.ratings,
+    statsByGame: u.statsByGame,
+    achievements: u.achievements,
+    daily: getDailyView(u),
+    history: u.history,
+    bestStreak: u.bestStreak,
+    clan: clan ? { id: clan.id, name: clan.name, tag: clan.tag } : undefined,
+    clanId: clan?.id,
+    clanName: clan?.name,
+    ownedItems: u.ownedItems,
+  };
+};
+
+const toLeaderboardEntry = (u: StoredUser, gameType?: GameType) => ({
   id: u.id,
-  telegramId: u.telegramId,
-  username: u.username,
   displayName: u.displayName,
-  avatarUrl: u.avatarUrl,
-  ratingElo: u.ratingElo,
-  gamesPlayed: u.gamesPlayed,
-  gamesWon: u.gamesWon,
-  vipStatus: false,
+  ratingElo: gameType ? u.ratings?.[gameType] ?? DEFAULT_ELO : u.ratingElo,
+  gamesPlayed: gameType ? u.statsByGame?.[gameType]?.played || 0 : u.gamesPlayed,
+  gamesWon: gameType ? u.statsByGame?.[gameType]?.won || 0 : u.gamesWon,
 });
 
-const toLeaderboardEntry = (u: StoredUser) => ({
-  id: u.id,
-  displayName: u.displayName,
-  ratingElo: u.ratingElo,
-  gamesPlayed: u.gamesPlayed,
-  gamesWon: u.gamesWon,
-});
+// VIP o'yinchi stolda 👑 nishon bilan ko'rinadi
+const applyBadge = (room: GameRoom, playerId: string) => {
+  const player = room.engine.players.find(p => p.id === playerId);
+  if (player) player.badge = userStore.isVip(playerId) ? '👑' : undefined;
+};
+
+// Mahalla nomi 3-30 belgi, tegi 2-5 lotin harf/raqam
+const sanitizeClanName = (raw: any): string | null => {
+  if (typeof raw !== 'string') return null;
+  const clean = raw.replace(/[\u0000-\u001f\u007f<>]/g, '').replace(/\s+/g, ' ').trim().slice(0, 30);
+  return clean.length >= 3 ? clean : null;
+};
+const sanitizeClanTag = (raw: any): string | null => {
+  if (typeof raw !== 'string') return null;
+  const tag = raw.trim().toUpperCase();
+  return /^[A-Z0-9]{2,5}$/.test(tag) ? tag : null;
+};
 
 // Ko'rinadigan ism: boshqaruv belgilarisiz, 2-24 belgi
 const sanitizeName = (raw: any): string | null => {
@@ -194,27 +233,38 @@ const broadcastOnlineUsers = () => {
 
 // O'yin tugaganda: statistika va (kamida 2 ta odam bo'lsa) ELO yangilanadi, o'yinchilarga yangi profil yuboriladi
 roomManager.onGameOver = (room: GameRoom) => {
-  const humans = room.engine.players.filter(p => !p.isBot && userStore.get(p.id)).map(p => p.id);
+  const effects = recordRoomResult(room, userStore);
+  const humans = Array.from(effects.keys());
   if (humans.length === 0) return;
-  const { winners, losers } = room.engine.getFinalResults();
-  const humanSet = new Set(humans);
-  const deltas = userStore.recordGameResult({
-    gameType: room.settings.gameType,
-    humanPlayerIds: humans,
-    winners: winners.filter(id => humanSet.has(id)),
-    losers: losers.filter(id => humanSet.has(id)),
-    rated: humans.length >= 2,
-  });
 
   for (const id of humans) {
     const user = userStore.get(id)!;
+    const effect = effects.get(id);
     const session = onlineUsers.get(id);
     if (session) {
       session.info.ratingElo = user.ratingElo;
-      sendTo(session.ws, { type: 'PROFILE_UPDATE', profile: toProfile(user), ratingDelta: deltas.get(id) || 0 });
+      sendTo(session.ws, {
+        type: 'PROFILE_UPDATE',
+        profile: toProfile(user),
+        ratingDelta: effect?.delta || 0,
+        newAchievements: effect?.newAchievements || [],
+        dailyJustCompleted: !!effect?.dailyJustCompleted,
+      });
     }
   }
   broadcastOnlineUsers();
+};
+
+// Telegram Stars to'lovi muvaffaqiyatli bo'ldi: mahsulot beriladi va o'yinchiga yangi profil yuboriladi
+telegramBot.onPayment = (event) => {
+  const user = userStore.grantShopItem(event.userId, event.itemId, event.chargeId);
+  if (!user) {
+    console.error(`❌ [Shop] To'lov qo'llanmadi: ${event.userId} / ${event.itemId} / ${event.chargeId}`);
+    return;
+  }
+  console.log(`💫 [Shop] ${user.displayName} sotib oldi: ${event.itemId}`);
+  const session = onlineUsers.get(user.id);
+  if (session) sendTo(session.ws, { type: 'PROFILE_UPDATE', profile: toProfile(user), purchasedItemId: event.itemId });
 };
 
 // WebSocket boshqaruvi
@@ -256,6 +306,7 @@ wss.on('connection', (ws: WebSocket) => {
     leaveCurrentRoom(room.id);
     const joined = room.addPlayer(currentPlayerId, displayNameOf(currentPlayerId), false, sender, avatarOf(currentPlayerId));
     if (!joined) return false;
+    applyBadge(room, currentPlayerId);
     currentRoomId = room.id;
     setUserStatus(currentPlayerId, room.id);
     sender({ type: 'ROOM_JOINED', roomId: room.id, settings: room.settings });
@@ -314,7 +365,13 @@ wss.on('connection', (ws: WebSocket) => {
       ws,
     });
 
-    sender({ type: 'SESSION', profile: toProfile(user), guestToken: issuedGuestToken, isTelegram: !!tgUser });
+    sender({
+      type: 'SESSION',
+      profile: toProfile(user),
+      guestToken: issuedGuestToken,
+      isTelegram: !!tgUser,
+      botUsername: telegramBot.getStatus().botUsername,
+    });
     broadcastOnlineUsers();
   };
 
@@ -341,7 +398,8 @@ wss.on('connection', (ws: WebSocket) => {
 
       // 0.2 Reyting jadvali
       if (type === 'GET_LEADERBOARD') {
-        sender({ type: 'LEADERBOARD', players: userStore.leaderboard(30).map(toLeaderboardEntry) });
+        const gameType = parseGameType(payload.gameType);
+        sender({ type: 'LEADERBOARD', gameType: gameType || null, players: leaderboardFor(gameType) });
         return;
       }
 
@@ -387,6 +445,8 @@ wss.on('connection', (ws: WebSocket) => {
           avatarOf(playerId),
           parseTableOptions(payload.options).options
         );
+        applyBadge(room, playerId);
+        room.broadcastState();
         currentRoomId = room.id;
         setUserStatus(playerId, room.id);
         sender({ type: 'ROOM_CREATED', roomId: room.id, settings: room.settings });
@@ -428,6 +488,7 @@ wss.on('connection', (ws: WebSocket) => {
             tableOptions.turnSeconds
           );
         }
+        applyBadge(room, playerId);
         currentRoomId = room.id;
         setUserStatus(playerId, room.id);
         sender({ type: 'ROOM_CREATED', roomId: room.id, settings: room.settings });
@@ -446,7 +507,7 @@ wss.on('connection', (ws: WebSocket) => {
         setUserStatus(playerId, null);
         matchmaker.join({
           playerId,
-          elo: userStore.get(playerId)?.ratingElo ?? 1000,
+          elo: userStore.ratingFor(playerId, options.gameType),
           gameType: options.gameType,
           rules: options.rules,
           totalPlayers: options.totalPlayers,
@@ -482,6 +543,7 @@ wss.on('connection', (ws: WebSocket) => {
         leaveCurrentRoom(roomId);
         const joined = room.addPlayer(playerId, displayNameOf(playerId), false, sender, avatarOf(playerId));
         if (joined) {
+          applyBadge(room, playerId);
           currentRoomId = roomId;
           setUserStatus(playerId, roomId);
           sender({ type: 'ROOM_JOINED', roomId, settings: room.settings });
@@ -572,6 +634,57 @@ wss.on('connection', (ws: WebSocket) => {
             message: `⚠️ Do'stingiz (@${cleanTarget}) hozir ilovada onlayn emas. Unga Telegram orqali havola ulashing!`,
           });
         }
+        return;
+      }
+
+      // 2.3 Mahallalar (klanlar) va haftalik liga
+      if (type === 'CLAN_LIST') {
+        const me = userStore.get(playerId);
+        sender({
+          type: 'CLANS',
+          clans: userStore.listClans(),
+          myClan: me?.clanId ? userStore.clanDetail(me.clanId) || null : null,
+        });
+        return;
+      }
+      if (type === 'CLAN_CREATE' || type === 'CLAN_JOIN' || type === 'CLAN_LEAVE') {
+        let error: string | undefined;
+        if (type === 'CLAN_CREATE') {
+          const name = sanitizeClanName(payload.name);
+          const tag = sanitizeClanTag(payload.tag);
+          if (!name || !tag) error = "Nom 3-30 belgi, teg 2-5 lotin harf yoki raqam bo'lishi kerak";
+          else error = userStore.createClan(playerId, name, tag).error;
+        } else if (type === 'CLAN_JOIN') {
+          error = typeof payload.clanId === 'string' ? userStore.joinClan(playerId, payload.clanId).error : 'Mahalla topilmadi';
+        } else {
+          userStore.leaveClan(playerId);
+        }
+        if (error) {
+          sender({ type: 'ACTION_ERROR', message: error });
+          return;
+        }
+        const me = userStore.get(playerId)!;
+        sender({ type: 'PROFILE_UPDATE', profile: toProfile(me) });
+        sender({ type: 'CLANS', clans: userStore.listClans(), myClan: me.clanId ? userStore.clanDetail(me.clanId) || null : null });
+        return;
+      }
+
+      // 2.4 Do'kon: Telegram Stars hisob-fakturasi
+      if (type === 'BUY_ITEM') {
+        const item = typeof payload.itemId === 'string' ? findShopItem(payload.itemId) : undefined;
+        const me = userStore.get(playerId);
+        if (!item) {
+          sender({ type: 'ACTION_ERROR', message: 'Mahsulot topilmadi' });
+          return;
+        }
+        if (!me?.telegramId) {
+          sender({ type: 'ACTION_ERROR', message: "Xarid faqat Telegram ichida mumkin (Stars orqali)" });
+          return;
+        }
+        const link = await telegramBot.createInvoiceLink(item, playerId);
+        sender(link
+          ? { type: 'INVOICE', itemId: item.id, link }
+          : { type: 'ACTION_ERROR', message: "To'lov hozircha mavjud emas, keyinroq urinib ko'ring" });
         return;
       }
 

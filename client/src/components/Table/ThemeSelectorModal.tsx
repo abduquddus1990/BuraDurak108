@@ -9,6 +9,7 @@ import {
 } from '../../types/theme';
 import { Palette, Layers, Sparkles, Check, X, Shield } from 'lucide-react';
 import { triggerHaptic } from '../../services/telegramSdk';
+import { useShop, shopItemForTheme } from '../../services/shop';
 
 interface ThemeSelectorModalProps {
   currentThemeId: TableThemeId;
@@ -32,6 +33,27 @@ export const ThemeSelectorModal: React.FC<ThemeSelectorModalProps> = ({
   onSelectCardBack,
 }) => {
   const [activeTab, setActiveTab] = useState<'table' | 'bg' | 'card'>('table');
+  const { isUnlocked, buyItem } = useShop();
+
+  // Premium dizayn qulflangan bo'lsa - tanlash o'rniga sotib olish taklif qilinadi
+  const choose = (themeId: string, select: () => void) => {
+    if (isUnlocked(themeId)) {
+      triggerHaptic('medium');
+      select();
+      return;
+    }
+    const item = shopItemForTheme(themeId);
+    if (item) buyItem(item.id);
+  };
+  const lockLabel = (themeId: string) => {
+    if (isUnlocked(themeId)) return null;
+    const item = shopItemForTheme(themeId);
+    return item ? (
+      <span className="ml-auto shrink-0 text-[10px] font-black text-amber-300 bg-amber-950/80 border border-amber-600/60 rounded-full px-1.5 py-0.5">
+        🔒 {item.priceStars}⭐
+      </span>
+    ) : null;
+  };
 
   if (!isOpen) return null;
 
@@ -97,10 +119,7 @@ export const ThemeSelectorModal: React.FC<ThemeSelectorModalProps> = ({
                 return (
                   <button
                     key={theme.id}
-                    onClick={() => {
-                      triggerHaptic('medium');
-                      onSelectTheme(theme.id);
-                    }}
+                    onClick={() => choose(theme.id, () => onSelectTheme(theme.id))}
                     className={`p-2.5 rounded-2xl flex items-center gap-2 border-2 text-left transition ${
                       isSelected ? 'border-amber-400 bg-stone-800 shadow scale-[1.02]' : 'border-stone-800 bg-stone-800/40 hover:border-stone-600'
                     }`}
@@ -112,6 +131,7 @@ export const ThemeSelectorModal: React.FC<ThemeSelectorModalProps> = ({
                       {isSelected && <Check className="w-3.5 h-3.5 text-white" />}
                     </span>
                     <span className="text-xs font-bold text-stone-200 truncate">{theme.name}</span>
+                    {lockLabel(theme.id)}
                   </button>
                 );
               })}
@@ -161,10 +181,7 @@ export const ThemeSelectorModal: React.FC<ThemeSelectorModalProps> = ({
                 return (
                   <button
                     key={cb.id}
-                    onClick={() => {
-                      triggerHaptic('medium');
-                      onSelectCardBack(cb.id);
-                    }}
+                    onClick={() => choose(cb.id, () => onSelectCardBack(cb.id))}
                     className={`p-2.5 rounded-2xl flex items-center gap-2 border-2 text-left transition ${
                       isSelected ? 'border-amber-400 bg-stone-800 shadow scale-[1.02]' : 'border-stone-800 bg-stone-800/40 hover:border-stone-600'
                     }`}
@@ -176,6 +193,7 @@ export const ThemeSelectorModal: React.FC<ThemeSelectorModalProps> = ({
                       {cb.symbol}
                     </span>
                     <span className="text-xs font-bold text-stone-200 truncate">{cb.name}</span>
+                    {lockLabel(cb.id)}
                   </button>
                 );
               })}

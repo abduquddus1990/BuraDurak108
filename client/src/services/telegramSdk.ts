@@ -23,6 +23,14 @@ export function getTelegramInitData(): string {
   return (window as any).Telegram?.WebApp?.initData || '';
 }
 
+// Telegram Stars hisob-fakturasini ochish; natija: 'paid' | 'cancelled' | 'failed' | 'pending'
+export function openInvoice(link: string, onStatus: (status: string) => void): boolean {
+  const tg = (window as any).Telegram?.WebApp;
+  if (!tg?.openInvoice) return false;
+  tg.openInvoice(link, onStatus);
+  return true;
+}
+
 export function initTelegramApp(): void {
   const tg = (window as any).Telegram?.WebApp;
   if (tg) {
