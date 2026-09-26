@@ -84,6 +84,10 @@ console.log('--- 🧪 CHOYXONA QOIDALARI TESTLARI ---\n');
     "Yolg'iz qolgan dama: qarg'a 40, boshqasi 20"
   );
   assert(
+    OneHundredEightEngine.handPenalty([card('SPADES', 'Q'), card('HEARTS', 'Q')]) === 6,
+    "Qo'lda 2 ta dama qolsa: 3 + 3 = 6 ochko"
+  );
+  assert(
     OneHundredEightEngine.handPenalty([card('SPADES', 'J')]) === 2 && OneHundredEightEngine.handPenalty([card('HEARTS', 'J')]) === 2,
     'Valet har qanday mastda 2 ochko'
   );
